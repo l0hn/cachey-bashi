@@ -56,39 +56,46 @@ namespace cachey_bashi.tests
             }
 
             var sw = new Stopwatch();
-            sw.Start();
             
             Console.WriteLine($"Creating {count:N0} HashBins");
             for (int i = 0; i < count; i++)
             {
+                sw.Start();
                 hashBins[i] = new HashBin(randHashes[i]);
+                sw.Stop();
             }
             Console.WriteLine($"Took {sw.ElapsedMilliseconds:N2}ms to create {count:N0} HashBins");
-            sw.Restart();
+            sw.Reset();
             Console.WriteLine($"Creating {count:N0} Hash Strings");
             for (int i = 0; i < count; i++)
             {
+                sw.Start();
                 hashStrs[i] = randHashes[i].ToHexString();
+                sw.Stop();
             }
             Console.WriteLine($"Took {sw.ElapsedMilliseconds:N2}ms to create {count:N0} Hash Strings");
             
-            sw.Restart();
+            sw.Reset();
             Console.WriteLine($"Comparing {count:N0} HashBins");
             int matches = 0;
             for (int i = 0; i < count; i++)
             {
+                sw.Start();
                 if (new HashBin(randHashes[i]) == hashBins[i])
                     matches++;
+                sw.Stop();
             }
             Console.WriteLine($"Took {sw.ElapsedMilliseconds:N2}ms to compare {count:N0} HashBins (matches={matches:N0})");
             Assert.AreEqual(count, matches);
-            sw.Restart();
+            sw.Reset();
             Console.WriteLine($"Comparing {count:N0} HashStrings");
             matches = 0;
             for (int i = 0; i < count; i++)
             {
+                sw.Start();
                 if (randHashes[i].ToHexString() == hashStrs[i])
                     matches++;
+                sw.Stop();
             }
             Console.WriteLine($"Took {sw.ElapsedMilliseconds:N2}ms to compare {count:N0} Hash Strings (matches={matches:N0})");
             Assert.AreEqual(count, matches);

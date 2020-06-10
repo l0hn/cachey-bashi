@@ -27,9 +27,10 @@ namespace cachey_bashi
             
             _file = indexFile;
             _indexKeyLen = indexKeyLen;
-            _requiredDatLength = CalculateRequiredLength(_indexKeyLen);
+            _requiredDatLength = CalculateRequiredLength();
             _indexData = new byte[_requiredDatLength];
-            _keyShift = _ulongSize - (_indexKeyLen * 2);
+            _indexData[0] = _indexKeyLen;
+            _keyShift = (_ulongSize - (_indexKeyLen))*8;
             if (overwriteNew)
             {
                 File.Delete(indexFile);
@@ -40,19 +41,16 @@ namespace cachey_bashi
             }
         }
 
-        int CalculateRequiredLength(byte indexKeyLen)
+        int CalculateRequiredLength()
         {
             //max number representable by index key byte size
-            var maxAddrCount = (long)Math.Pow(2, _indexKeyLen * sizeof(byte));
+            var maxAddrCount = (long)Math.Pow(2, _indexKeyLen * 8);
             return (int)(maxAddrCount * sizeof(ulong)) + 1;
         }
         
         public void WriteToDisk()
         {
-            using var file = File.Open(_file, FileMode.CreateNew);
-            using var writter = new BinaryWriter(file);
-            writter.Write(BitConverter.GetBytes(_indexKeyLen));
-            writter.Write(_indexData);
+            File.WriteAllBytes(_file, _indexData);
         }
 
         public void LoadFromDisk()
@@ -74,7 +72,8 @@ namespace cachey_bashi
                 throw new ArgumentException($"Index file length is incorrect, expected {_requiredDatLength}, got {file.Length}");
             }
 
-            reader.Read(_indexData, 1, _requiredDatLength - 1);
+            file.Position = 0;
+            reader.Read(_indexData, 0, _requiredDatLength);
         }
 
         public unsafe void SetStartIndexForKey(byte[] key, ulong addrStart)
@@ -96,16 +95,16 @@ namespace cachey_bashi
             int indexLocation = -1; 
             if (key.Length >= _ulongSize)
             {
-                fixed (byte* pKey = &key[0])
+                fixed (byte* pKey = &key[^(_ulongSize)])
                 {
-                    indexLocation = (int)(*(ulong*) pKey >> _keyShift) + 1;
+                    indexLocation = (int)(((*(ulong*) pKey) >>_keyShift)<<3)+1;
                 }
             }
             else
             {
-                for (int i = 0; i < _indexKeyLen; i++)
+                for (int i = _indexKeyLen-1; i > 0; i--)
                 {
-                    indexLocation += key[i] << ((_indexKeyLen - i)<<3);
+                    indexLocation += key[i] << ((i - _indexKeyLen)<<3);
                 }
             }
 

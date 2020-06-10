@@ -13,7 +13,7 @@ namespace cachey_bashi
         private string _keyFile;
         private string _datFile;
 
-        private CbIndex<T> _cbIndex;
+        private CbIndex _cbIndex;
         
         public CacheyBashi(string directory, string dbName)
         {
@@ -23,7 +23,7 @@ namespace cachey_bashi
             _indexFile = Path.Combine(_dir, dbName) + ".index";
             _keyFile = Path.Combine(_dir, dbName) + ".key";
             _datFile = Path.Combine(_dir, dbName) + ".dat";
-            _cbIndex = new CbIndex<T>(_indexFile);
+            _cbIndex = new CbIndex(_indexFile);
         }
 
         public byte[] GetValue(byte[] key)
@@ -32,6 +32,7 @@ namespace cachey_bashi
             //possibly want the last index of the e.g 0x1234 so we don't need to continually compare the first 4 bytes.
             
             //start reading from the key file a ulong at a time, use bitwise to compare  
+            return null;
         }
         
         // public void Insert(byte[] key, byte[] data)
