@@ -9,8 +9,15 @@ namespace cachey_bashi.tests
     public class CbIndexTest
     {
         [Test]
-        public void CbTest()
+        [TestCase(false, 2)]
+        [TestCase(true, 2)]
+        [TestCase(false, 3)]
+        [TestCase(true, 3)]
+        [TestCase(false, 4)]
+        [TestCase(true, 4)]
+        public void CbTest(bool shortHash = false, int indexKeyLength = 2)
         {
+            int hashLength = shortHash ? 6 : 16;//16 bytes to simulate MD5 which is a common usage but could be any length key
             var cbIndex = new CbIndex("memtest.index", 2, true);
             var r = new Random(DateTime.UtcNow.Millisecond);
 
@@ -21,7 +28,7 @@ namespace cachey_bashi.tests
             
             for (ushort i = 0; i < maxKeys; i++)
             {
-                var buf = new byte[16];//16 bytes to simulate MD5 which is a common usage but could be any length key
+                var buf = new byte[hashLength];
                 r.NextBytes(buf);
                 //replace the first part of the key with sequential nums. e.g. 0x00, 0x01, 0x02
                 //and leave the rest random nums to simulate real-world usage.

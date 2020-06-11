@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 
 namespace cachey_bashi
@@ -7,6 +8,9 @@ namespace cachey_bashi
     {
         private byte[] _hash;
         private int _length;
+
+        public int Length => _length;
+        public byte[] Hash => _hash;
 
         public HashBin(string hexStr)
         {
@@ -17,10 +21,14 @@ namespace cachey_bashi
         public HashBin(byte[] hash)
         {
             _length = hash.Length;
-            if (_length % sizeof(ulong) != 0)
+            if (_length < sizeof(ulong))
+            {
+                _hash = new byte[sizeof(ulong)];
+            }
+            else if (_length % sizeof(ulong) != 0)
             {
                 //padding required.
-                _hash = new byte[_length+1];
+                _hash = new byte[_length+sizeof(ulong)];
             }
             else
             {
@@ -28,6 +36,19 @@ namespace cachey_bashi
             }
             
             Array.Copy(hash, _hash, _length);
+        }
+
+        public HashBin(Stream stream, int length)
+        {
+            _length = length;
+            if (length <= sizeof(ulong))
+                _hash = new byte[sizeof(ulong)];
+            else if (length % sizeof(ulong) == 0)
+                _hash = new byte[length];
+            else
+                _hash = new byte[length+sizeof(ulong)];
+                
+            stream.Read(_hash, 0, length);
         }
 
         public static unsafe bool operator ==(HashBin a, HashBin b)

@@ -18,6 +18,8 @@ namespace cachey_bashi.tests
         [TestCase(32)]
         [TestCase(64)]
         [TestCase(17)]//will cause padding in HashBin backing array.
+        [TestCase(14)]//will cause padding in HashBin backing array.
+        [TestCase(6)]
         public void EqualityBasic(int keyLen)
         {
             var r = new Random(DateTime.UtcNow.Millisecond);

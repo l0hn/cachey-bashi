@@ -91,24 +91,29 @@ namespace cachey_bashi
             {
                 throw new ArgumentException("key must be larger than the key index");
             }
-            
-            int indexLocation = -1; 
+
+            int indexLocation = 0; 
             if (key.Length >= _ulongSize)
             {
-                fixed (byte* pKey = &key[^(_ulongSize)])
+                fixed (byte* pKey = &key[key.Length-_ulongSize])                
                 {
-                    indexLocation = (int)(((*(ulong*) pKey) >>_keyShift)<<3)+1;
+                    //we could just use the first n bytes of key.
+                    //but that makes it quite difficult to test.
+                    //..and it's nice to have the data aligned e.g 0x01, 0x02
+                    return (int)(((*(ulong*) pKey) >>_keyShift)<<3)+1;
                 }
             }
             else
             {
-                for (int i = _indexKeyLen-1; i > 0; i--)
+                //they key isn't long enough for us to cast to ulong so loop through bytes
+                for (int i = 0; i < _indexKeyLen; i++)
                 {
-                    indexLocation += key[i] << ((i - _indexKeyLen)<<3);
+                    var nextByte = key[i + key.Length - _indexKeyLen];
+                    indexLocation += nextByte << (i<<3);
                 }
+                indexLocation <<= 3;//multiple by 8 (ulong is 8 bytes)
+                return ++indexLocation;//offset by one for the header
             }
-
-            return indexLocation;
         }
         
         public unsafe ulong GetStartAddressForKey(byte[] key)
