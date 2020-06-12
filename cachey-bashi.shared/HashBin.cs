@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Security.Policy;
 
 namespace cachey_bashi
 {
-    public class HashBin
+    public class HashBin: IComparable, IComparable<HashBin>
     {
         private byte[] _hash;
         private int _length;
@@ -38,36 +40,37 @@ namespace cachey_bashi
             Array.Copy(hash, _hash, _length);
         }
 
-        public HashBin(Stream stream, int length)
+        
+        
+        public HashBin(Stream stream, int count)
         {
-            _length = length;
-            if (length <= sizeof(ulong))
-                _hash = new byte[sizeof(ulong)];
-            else if (length % sizeof(ulong) == 0)
-                _hash = new byte[length];
-            else
-                _hash = new byte[length+sizeof(ulong)];
-                
-            stream.Read(_hash, 0, length);
+            
         }
 
-        public static unsafe bool operator ==(HashBin a, HashBin b)
+        
+        static unsafe int Compare(HashBin a, HashBin b)
         {
-            if ((a is null & !(b is null)) || (b is null & !(a is null)))
-                return false;
+            if (a is null & !(b is null))
+                return -1;
 
+            if (b is null & !(a is null))
+            {
+                return 1;
+            }
+            
             if (a is null && b is null)
             {
-                return true;
+                return 0;
             }
 
             var aLen = a._hash.Length;
-            
-            if (aLen != b._hash.Length)
-            {
-                return false;
-            }
 
+            if (aLen < b._hash.Length)
+                return -1;
+            
+            if (aLen > b._hash.Length)
+                return 1;
+            
             fixed (byte* pA = &a._hash[0])
             fixed (byte* pB = &b._hash[0])
             {
@@ -75,17 +78,22 @@ namespace cachey_bashi
                 ulong* pCurrentB = (ulong*)pB;
                 for (int i = 0; i < aLen; i+=sizeof(ulong))
                 {
-                    if (*pCurrentA != *pCurrentB)
-                    {
-                        return false;
-                    }
+                    if (*pCurrentA < *pCurrentB)
+                        return -1;
+                    if (*pCurrentA > *pCurrentB)
+                        return 1;
 
                     pCurrentA++;
                     pCurrentB++;
                 }
             }
 
-            return true;
+            return 0;
+        }
+        
+        public static unsafe bool operator ==(HashBin a, HashBin b)
+        {
+            return Compare(a, b) == 0;
         }
 
         public static bool operator !=(HashBin a, HashBin b)
@@ -93,7 +101,22 @@ namespace cachey_bashi
             return !(a == b);
         }
 
-        public override bool Equals(object? obj)
+        public static bool operator >(HashBin a, HashBin b)
+        {
+            return a.CompareTo(b) == 1;
+        }
+        
+        public static bool operator <(HashBin a, HashBin b)
+        {
+            return a.CompareTo(b) == -1;
+        }
+
+        public int CompareTo(HashBin other)
+        {
+            return Compare(this, other);
+        }
+
+        public override bool Equals(object obj)
         {
             return this == obj as HashBin;
         }
@@ -101,6 +124,15 @@ namespace cachey_bashi
         public override string ToString()
         {
             return string.Concat(_hash.Take(_length).Select(i => i.ToString("x2")));
+        }
+
+        public int CompareTo(object obj)
+        {
+            var hB = obj as HashBin;
+            if (hB == null)
+                return 1;
+            
+            return CompareTo(hB);
         }
     }
 }

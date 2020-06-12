@@ -12,63 +12,88 @@ namespace cachey_bashi
         private string _file;
         private ulong _count;
         private ushort _keyLength;
-        private FileStream _fileStream;
+        internal FileStream FileStream { get; }
         private BinaryReader _reader;
-        private ulong _keyStart = sizeof(ulong);
+        private ulong _keyStart;
         private ulong _keyEnd;
+        private ulong _ulongSize;
+        internal ulong HeaderLength { get; }
 
-        public CbKeyFixed(string keyFile, byte keyLength = 16, bool createNew = false)
+        public CbKeyFixed(string keyFile, ushort keyLength = 16, bool createNew = false)
         {
+            _ulongSize = sizeof(ulong);
+            HeaderLength = _ulongSize;
+            _keyStart = HeaderLength;
+            
             _keyLength = keyLength;
             _file = keyFile;
             if (File.Exists(_file) && createNew)
                 File.Delete(_file);
 
-            _fileStream = File.OpenWrite(_file);
-            _reader = new BinaryReader(_fileStream);
+            FileStream = File.OpenWrite(_file);
+            _reader = new BinaryReader(FileStream);
 
-            if (_fileStream.Length > 8)
+            if (FileStream.Length > 8)
             {
                 _count = _reader.ReadUInt64();
                 _keyEnd = _count * _keyLength;
             }
         }
 
-        public bool GetKeyDataAddrLocation(HashBin key, out ulong location, ulong startHint = 0, ulong endHint = 0)
+        public bool HasKey(HashBin key, KeyHint hint = default(KeyHint))
         {
-            location = 0;
+            return HasKey(key, out var unused, false, hint);
+        }
+
+        public bool GetKeyDataAddr(HashBin key, out DataAddr dataAddr, KeyHint hint = default(KeyHint))
+        {
+            return HasKey(key, out dataAddr, true, hint);
+        }
+        
+        public bool HasKey(HashBin key, out DataAddr dataAddr, bool getDataAddr = false, KeyHint hint = default(KeyHint))
+        {
+            dataAddr = new DataAddr();
             if (key.Length != _keyLength)
                 throw new ArgumentException($"Key must be {_keyLength} bytes");
 
-            bool hasHint = startHint >= _keyStart && 
-                           endHint > startHint 
-                           && endHint <= _keyEnd;
+            bool hasHint = hint.StartAddr >= _keyStart && 
+                           hint.EndAddr > hint.StartAddr 
+                           && hint.EndAddr <= _keyEnd;
 
             if (!hasHint)
             {
-                startHint = _keyStart;
-                endHint = _keyEnd;
+                hint.StartAddr = _keyStart;
+                hint.EndAddr = _keyEnd;
             }
             
-            _fileStream.Position = (long)startHint;
-            for (ulong position = startHint; position < endHint; position += _keyLength)
+            FileStream.Position = (long)hint.StartAddr;
+            while (FileStream.Position < (long)hint.EndAddr)
             {
-                var currentHashBin = new HashBin(_fileStream, _keyLength);
+                var currentHashBin = new HashBin(FileStream, _keyLength);
                 if (currentHashBin == key)
                 {
-                    var foundLocation = position - _keyLength;
-                    //how can I avoid this division? 
-                    location = _keyStart + (((foundLocation - _keyStart) / _keyLength) << 4);
+                    if (getDataAddr)
+                    {
+                        var foundLocation = (ulong)FileStream.Position - _keyLength;
+                        FileStream.Position = (long)((((foundLocation) / _keyLength) << 4) + _keyEnd + HeaderLength);
+                        dataAddr.addr = _reader.ReadUInt64();
+                        dataAddr.len = _reader.ReadUInt64();
+                    }
                     return true;
                 }
             }
-            
             return false;
         }
 
         public void Dispose()
         {
-            _fileStream?.Dispose();
+            FileStream?.Dispose();
         }
+    }
+
+    public struct DataAddr
+    {
+        public ulong addr;
+        public ulong len;
     }
 }

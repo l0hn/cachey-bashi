@@ -15,7 +15,7 @@ namespace cachey_bashi.tests
         [TestCase(true, 3)]
         [TestCase(false, 4)]
         [TestCase(true, 4)]
-        public void CbTest(bool shortHash = false, int indexKeyLength = 2)
+        public void TestCbIndex(bool shortHash = false, int indexKeyLength = 2)
         {
             int hashLength = shortHash ? 6 : 16;//16 bytes to simulate MD5 which is a common usage but could be any length key
             var cbIndex = new CbIndex("memtest.index", 2, true);
@@ -35,7 +35,9 @@ namespace cachey_bashi.tests
                 buf[^1] = (byte) (i >> 8);
                 buf[^2] = (byte) i;
                 dummyData[i] = buf;
-                cbIndex.SetStartIndexForKey(buf, (ulong)i+1);
+                cbIndex.SetHintForKey(buf, new KeyHint() {StartAddr = (ulong)i+1, EndAddr = (ulong)i+2});
+                // cbIndex.SetStartIndexForKey(buf, (ulong)i+1);
+                // cbIndex.SetEndIndexForKey(buf, (ulong)i+2);
             }
             
             //verify
@@ -48,9 +50,10 @@ namespace cachey_bashi.tests
                     var key = dummyData[i];
                     var expectedIndex = (ulong)i + 1;
                     sw.Start();
-                    var res = c.GetStartAddressForKey(key);
+                    var res = c.GetAddressHintForKey(key);
+                    
                     sw.Stop();
-                    Assert.AreEqual(expectedIndex, res);
+                    Assert.AreEqual(expectedIndex, res.StartAddr);
                 }
                 Console.WriteLine($"Index lookup for {maxKeys} keys took: {sw.ElapsedMilliseconds:N}ms");
             });

@@ -12,6 +12,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)CacheyBashi.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CbIndex.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)CbKey.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CbWriter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)HashBin.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Util.cs" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace cachey_bashi
 {
@@ -10,7 +11,7 @@ namespace cachey_bashi
         //0x01..n: 8 bytes indicating memory address of the beginning of the keys in the key file for this address offset
         //e.g. 0x9998(+1) contains the start address for keys beginning with 0x9998 in the key file 
         private byte[] _indexData;
-        
+
         private string _file;
         private byte _indexKeyLen;
 
@@ -45,7 +46,7 @@ namespace cachey_bashi
         {
             //max number representable by index key byte size
             var maxAddrCount = (long)Math.Pow(2, _indexKeyLen * 8);
-            return (int)(maxAddrCount * sizeof(ulong)) + 1;
+            return (int)(maxAddrCount * (sizeof(ulong)*2)) + 1;
         }
         
         public void WriteToDisk()
@@ -61,12 +62,8 @@ namespace cachey_bashi
             //todo: read the file
             using var file = File.Open(_file, FileMode.Open);
             using var reader = new BinaryReader(file);
-            var indexKeyLen = reader.ReadByte();
-            if (indexKeyLen != _indexKeyLen)
-            {
-                throw new ArgumentException($"Index key length error: expected {_indexKeyLen}, however index file has {indexKeyLen}");
-            }
-
+            _indexKeyLen = reader.ReadByte();
+            _requiredDatLength = CalculateRequiredLength();
             if (file.Length != _requiredDatLength)
             {
                 throw new ArgumentException($"Index file length is incorrect, expected {_requiredDatLength}, got {file.Length}");
@@ -85,7 +82,32 @@ namespace cachey_bashi
             }
         }
 
-        unsafe int GetKeyIndexFromKey(byte[] key)
+        public unsafe void SetEndIndexForKey(byte[] key, ulong endAddr)
+        {
+            var index = GetKeyIndexFromKey(key);
+            fixed (byte* pIndex = &_indexData[index])
+            {
+                ulong* pEndAddr = (ulong*) pIndex;
+                pEndAddr++;
+                *pEndAddr = endAddr;
+            }
+        }
+
+        public unsafe void SetHintForKey(byte[] key, KeyHint hint)
+        {
+            var index = GetKeyIndexFromKey(key);
+            fixed (byte* pIndex = &_indexData[index])
+            {
+                (*(KeyHint*) pIndex) = hint;
+            }
+        }
+
+        public int GetKeyIndexFromKey(HashBin key)
+        {
+            return GetKeyIndexFromKey(key.Hash);
+        }
+        
+        public unsafe int GetKeyIndexFromKey(byte[] key)
         {
             if (key.Length < _indexKeyLen)
             {
@@ -100,7 +122,7 @@ namespace cachey_bashi
                     //we could just use the first n bytes of key.
                     //but that makes it quite difficult to test.
                     //..and it's nice to have the data aligned e.g 0x01, 0x02
-                    return (int)(((*(ulong*) pKey) >>_keyShift)<<3)+1;
+                    return (int)(((*(ulong*) pKey) >>_keyShift)<<4)+1;
                 }
             }
             else
@@ -111,24 +133,46 @@ namespace cachey_bashi
                     var nextByte = key[i + key.Length - _indexKeyLen];
                     indexLocation += nextByte << (i<<3);
                 }
-                indexLocation <<= 3;//multiple by 8 (ulong is 8 bytes)
+                indexLocation <<= 4;//multiple by 16 (ulong is 8 bytes and there's 2 per index)
                 return ++indexLocation;//offset by one for the header
             }
         }
         
-        public unsafe ulong GetStartAddressForKey(byte[] key)
+        public unsafe ulong GetAddressForKey(byte[] key, bool getEndAddr = false)
         {
+            //TODO: how can i also get the end addr key? would need to know where the next key starts :/
             var indexLocation = GetKeyIndexFromKey(key);
             if (indexLocation > 0)
             {
                 fixed (byte* pIndex = &_indexData[indexLocation])
                 {
+                    if (getEndAddr)
+                        return *(((ulong*) pIndex) + 1);
+                    
                     return *(ulong*)pIndex;
                 }
             }
             return 0;
         }
         
+        public unsafe KeyHint GetAddressHintForKey(byte[] key)
+        {
+            //TODO: how can i also get the end addr key? would need to know where the next key starts :/
+            var indexLocation = GetKeyIndexFromKey(key);
+            if (indexLocation > 0)
+            {
+                fixed (byte* pIndex = &_indexData[indexLocation])
+                {
+                    KeyHint* pHint = (KeyHint*) pIndex;
+                    return *pHint;
+                }
+            }
+            return new KeyHint();
+        }
+
+
+        
+
         // private void TypeCheck()
         // {
         //     if (!_validTypes.Contains(typeof(T)))
@@ -136,5 +180,12 @@ namespace cachey_bashi
         //         throw new ArgumentException("Type of T must one of: " + string.Concat(_validTypes, ", "));
         //     }
         // }
+    }
+    
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KeyHint
+    {
+        public ulong StartAddr;
+        public ulong EndAddr;
     }
 }
