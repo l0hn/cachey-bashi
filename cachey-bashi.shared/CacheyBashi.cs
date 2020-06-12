@@ -15,6 +15,8 @@ namespace cachey_bashi
 
         internal CbIndex CbIndex { get; }
         internal CbKeyFixed CbKey { get; }
+        
+        internal CbData CbData { get; }
 
         private CacheyBashi(string directory, string dbName, ushort keyLength, byte indexKeyLength = 2, bool createNew = false)
         {
@@ -27,6 +29,7 @@ namespace cachey_bashi
             
             CbIndex = new CbIndex(IndexFile, indexKeyLength, createNew);
             CbKey = new CbKeyFixed(KeyFile, keyLength, createNew);
+            CbData = new CbData(DatFile, createNew);    
         }
 
         public static CacheyBashi Create(string outDir, string dbName, IEnumerable<KeyValuePair<byte[], byte[]>> data, ushort keyLength, byte indexKeyLength = 2)
@@ -71,7 +74,10 @@ namespace cachey_bashi
         {
             var hint = CbIndex.GetAddressHintForKey(key);
             bool found = CbKey.GetKeyDataAddr(key, out var addr, hint);
-            //todo: read the data from the dat file
+            if (found)
+            {
+                return CbData.GetValue(addr);
+            }
             return null;
         }
     }

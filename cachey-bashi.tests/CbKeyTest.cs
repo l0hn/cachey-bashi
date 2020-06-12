@@ -23,7 +23,6 @@ namespace cachey_bashi.tests
             var numIndexes = CbIndex.MaxIndexesForIndexLength(indexKeyLength);
 
             string keyspaces = "0123456789abcdef";
-            var indexOffset = keyLength - indexKeyLength;
             // var debugHashBin = new HashBin("0000000000000000000000000000d8f4");
             foreach (var keyspace in keyspaces)
             {
@@ -77,16 +76,13 @@ namespace cachey_bashi.tests
             {
                 HashBin key = new HashBin(kvp.Key);
                 var dummyData = DummyData.FromJsonBytes(kvp.Value);
-                // if (key == debugSearch)
-                // {
-                //     Console.WriteLine("debug me");
-                // }
+                
                 Assert.True(cb.HasKey(key), $"key not found: {key.Hash.ToHexString()}");
-                //I haven't done the dat file yet :/
-                // var storedDummyData = DummyData.FromJsonBytes(cb.GetValue(key));
-                // Assert.AreEqual(dummyData.Message, storedDummyData.Message);
-                // Assert.AreEqual(dummyData.OriginalKey.ToHashBin(false), storedDummyData.OriginalKey.ToHashBin(false));
-                // Assert.AreEqual(dummyData.OriginalKeyIndex.ToHashBin(false), storedDummyData.OriginalKeyIndex.ToHashBin(false));
+                
+                var storedDummyData = DummyData.FromJsonBytes(cb.GetValue(key));
+                Assert.AreEqual(dummyData.Message, storedDummyData.Message);
+                Assert.AreEqual(dummyData.OriginalKey.ToHashBin(false), storedDummyData.OriginalKey.ToHashBin(false));
+                Assert.AreEqual(dummyData.OriginalKeyIndex.ToHashBin(false), storedDummyData.OriginalKeyIndex.ToHashBin(false));
             }
         }
     }

@@ -34,7 +34,7 @@ namespace cachey_bashi
                 keyDataArray[index].DataAddr.addr = (ulong)datFileIndex;
                 keyDataArray[index].DataAddr.len = (ulong)kvp.Value.Length;
                 //todo: need to write the dat file here so we can discard data from memory
-                //datFile.Write(kvp.Value etc..);
+                cb.CbData.UnsafeWrite(kvp.Value);
                 datFileIndex += kvp.Value.Length;
 
                 var newBatch = index == keyDataArray.Length - 1;
