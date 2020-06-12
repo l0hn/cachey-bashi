@@ -19,6 +19,7 @@ namespace cachey_bashi.tests
             var buf = new byte[1024];
             var written = 0;
             using var f = File.OpenWrite(tmpFile);
+            
             while (written < length)
             {
                 r.NextBytes(buf);

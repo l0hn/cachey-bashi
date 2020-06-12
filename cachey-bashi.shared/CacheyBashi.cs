@@ -34,6 +34,7 @@ namespace cachey_bashi
             var cb = new CacheyBashi(outDir, dbName, keyLength, indexKeyLength, true);
             
             //write everything
+            CbWriter.Write(cb, keyLength, data);
 
             return cb;
         }
@@ -44,10 +45,32 @@ namespace cachey_bashi
             return cb;
         }
 
-        public byte[] GetValue(byte[] key)
+        public bool HasKey(byte[] key)
+        {
+            return HasKey(new HashBin(key, false));
+        }
+
+        public bool HasKey(HashBin key)
         {
             var hint = CbIndex.GetAddressHintForKey(key);
-            bool found = CbKey.GetKeyDataAddr(new HashBin(key), out var addr, hint);
+            return CbKey.HasKey(key, hint);
+        }
+
+        public bool IndexHasKeySpaceForKey(byte[] key)
+        {
+            var hint = CbIndex.GetAddressHintForKey(key);
+            return hint.EndAddr > hint.StartAddr;
+        }
+        
+        public byte[] GetValue(byte[] key)
+        {
+            return GetValue(new HashBin(key, false));
+        }
+
+        public byte[] GetValue(HashBin key)
+        {
+            var hint = CbIndex.GetAddressHintForKey(key);
+            bool found = CbKey.GetKeyDataAddr(key, out var addr, hint);
             //todo: read the data from the dat file
             return null;
         }

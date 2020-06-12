@@ -42,10 +42,15 @@ namespace cachey_bashi
             }
         }
 
+        public static long MaxIndexesForIndexLength(byte indexLength)
+        {
+            return (long)Math.Pow(2, indexLength * 8);
+        }
+        
         int CalculateRequiredLength()
         {
             //max number representable by index key byte size
-            var maxAddrCount = (long)Math.Pow(2, _indexKeyLen * 8);
+            var maxAddrCount = MaxIndexesForIndexLength(_indexKeyLen);
             return (int)(maxAddrCount * (sizeof(ulong)*2)) + 1;
         }
         
@@ -153,6 +158,11 @@ namespace cachey_bashi
                 }
             }
             return 0;
+        }
+
+        public KeyHint GetAddressHintForKey(HashBin key)
+        {
+            return GetAddressHintForKey(key.Hash);
         }
         
         public unsafe KeyHint GetAddressHintForKey(byte[] key)

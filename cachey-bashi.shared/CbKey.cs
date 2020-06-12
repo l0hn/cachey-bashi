@@ -30,7 +30,7 @@ namespace cachey_bashi
             if (File.Exists(_file) && createNew)
                 File.Delete(_file);
 
-            FileStream = File.OpenWrite(_file);
+            FileStream = File.Open(_file, FileMode.OpenOrCreate);
             _reader = new BinaryReader(FileStream);
 
             if (FileStream.Length > 8)
@@ -38,6 +38,21 @@ namespace cachey_bashi
                 _count = _reader.ReadUInt64();
                 _keyEnd = _count * _keyLength;
             }
+        }
+
+        internal void PostWriteUpdate()
+        {
+            if (FileStream.Length > 8)
+            {
+                FileStream.Position = 0;
+                _count = _reader.ReadUInt64();
+                _keyEnd = _count * _keyLength;
+            }
+        }
+
+        public bool HasKey(byte[] key, KeyHint hint = default(KeyHint))
+        {
+            return HasKey(new HashBin(key, false), hint);
         }
 
         public bool HasKey(HashBin key, KeyHint hint = default(KeyHint))
@@ -67,7 +82,7 @@ namespace cachey_bashi
             }
             
             FileStream.Position = (long)hint.StartAddr;
-            while (FileStream.Position < (long)hint.EndAddr)
+            while (FileStream.Position <= (long)hint.EndAddr)
             {
                 var currentHashBin = new HashBin(FileStream, _keyLength);
                 if (currentHashBin == key)

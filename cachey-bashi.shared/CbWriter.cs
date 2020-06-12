@@ -19,48 +19,48 @@ namespace cachey_bashi
             
             //take batches of 100k? arbitraty or maybe roughly calc mem requirements
             var keyDataArray = new KeyData[100000];
-            var index = (ulong)0;
+            var index = 0;
             var datFileIndex = 0;
+            var keyCount = (ulong)0;
 
             foreach (var kvp in data)
             {
                 if (kvp.Key.Length != keyLength)
                     throw new ArgumentException($"All keys must be of the provided keyLength: {keyLength}");
                 
-                keyDataArray[index].Key=kvp.Key;
+                //need to copy the key array here incase someone is re-using the buffer
+                keyDataArray[index].Key = new byte[kvp.Key.Length];
+                Array.Copy(kvp.Key, keyDataArray[index].Key, keyLength);
                 keyDataArray[index].DataAddr.addr = (ulong)datFileIndex;
                 keyDataArray[index].DataAddr.len = (ulong)kvp.Value.Length;
                 //todo: need to write the dat file here so we can discard data from memory
                 //datFile.Write(kvp.Value etc..);
                 datFileIndex += kvp.Value.Length;
 
-                if (index == (ulong)keyDataArray.Length-1)//time to sort and start a new batch
+                var newBatch = index == keyDataArray.Length - 1;
+                
+                if (newBatch)//time to sort and start a new batch
                 {
-                    Array.Sort(keyDataArray, (keyData, keyData2) =>
-                    {
-                        var hA = new HashBin(keyData.Key);
-                        var hB = new HashBin(keyData2.Key);
-                        return hA.CompareTo(hB);
-                    });
-                    //write to batch file
                     var batchFile = string.Format(batchNameFormat, batchIndex);
-                    using var stream = new FileStream(batchFile, FileMode.CreateNew);
-                    var writer = new BinaryWriter(stream);
-                    foreach (var keyData in keyDataArray)
-                    {
-                        stream.Write(keyData.Key, 0, keyData.Key.Length);
-                        writer.Write(keyData.DataAddr.addr);
-                        writer.Write(keyData.DataAddr.len);
-                    }
+                    WriteBatch(keyDataArray, batchFile, keyDataArray.Length);
                     batchFiles.Add(batchFile);
                     batchIndex++;
+                    index = 0;
                 }
 
-                index++;
+                if (!newBatch)
+                    index++;
+                
+                keyCount++;
             }
 
-            var keyCount = index;
-            
+            if (index > 0) //write the remaining keys to the final batch
+            {
+                var batchFile = string.Format(batchNameFormat, batchIndex);
+                WriteBatch(keyDataArray, batchFile, (int)index);
+                batchFiles.Add(batchFile);
+            }
+
             //no more sorting required if only 1 batch so just write the file directly
             if (batchIndex == 1)
             {
@@ -85,6 +85,22 @@ namespace cachey_bashi
             SortAndWrite(batchFiles, keyCount, cb, keyLength, cb.KeyFile);
         }
 
+        static void WriteBatch(KeyData[] keyDataArray, string outFile, int count)
+        {
+            Array.Sort(keyDataArray, 0, count, new KeyDataComparer());
+            //write to batch file
+            
+            using var stream = new FileStream(outFile, FileMode.Create);
+            var writer = new BinaryWriter(stream);
+            for (int i = 0; i < count; i++)
+            {
+                stream.Write(keyDataArray[i].Key, 0, keyDataArray[i].Key.Length);
+                writer.Write(keyDataArray[i].DataAddr.addr);
+                writer.Write(keyDataArray[i].DataAddr.len);
+            }
+            
+        } 
+
         static void SortAndWrite(List<string> batchFiles, ulong keyCount, CacheyBashi cb, ushort keyLength, string outFile)
         {
             using var streams = new StreamCollection();
@@ -108,13 +124,27 @@ namespace cachey_bashi
 
             ulong keysWritten = 0;
             var addrOffset = cb.CbKey.HeaderLength + (keyCount * keyLength);
+            HashBin lastHash = null;
+
+// #if DEBUG
+//             var debugHash = new HashBin("0000000000000000000000000000d8f4");
+// #endif
             
             while (remainingBatches.Count > 0)
             {
                 var lowestBatch = remainingBatches.OrderBy(i => i.CurrentHashBin).First();
-                
-                if (lowestBatch.Complete)
-                    remainingBatches.Remove(lowestBatch);
+
+// #if DEBUG
+//                 if (lowestBatch.CurrentHashBin == null)
+//                 {
+//                     Console.WriteLine("DebugMe");
+//                 }
+//                 
+//                 if (debugHash == lowestBatch.CurrentHashBin)
+//                 {
+//                     Console.WriteLine("DebugMe");
+//                 }
+// #endif
 
                 //update the index if we've reached the end of a key range
                 var keyIndex = cb.CbIndex.GetKeyIndexFromKey(lowestBatch.CurrentHashBin);
@@ -124,12 +154,13 @@ namespace cachey_bashi
                 }
                 else if(currentKeyIndex != keyIndex)//we've reached the end of a key range
                 {
-                    cb.CbIndex.SetHintForKey(lowestBatch.CurrentHashBin.Hash, new KeyHint()
+                    var end = outStream.Position - keyLength;
+                    cb.CbIndex.SetHintForKey(lastHash.Hash, new KeyHint()
                     {
                         StartAddr = (ulong)currentKeyRangeStartAddr,
-                        EndAddr = (ulong)outStream.Position
+                        EndAddr = (ulong)end
                     });
-                    currentKeyRangeStartAddr = outStream.Position + keyLength;
+                    currentKeyRangeStartAddr = outStream.Position;
                     currentKeyIndex = keyIndex;
                 }
                 
@@ -145,12 +176,26 @@ namespace cachey_bashi
                 outStream.Position = pos;
                 
                 //finally move to the next key in the batch
-                lowestBatch.Next();
+                lastHash = lowestBatch.CurrentHashBin;
+
+                if (!lowestBatch.Next())
+                    remainingBatches.Remove(lowestBatch);
+                
                 keysWritten++;
             }
             
+            //don't forget to set the last item's key hint!
+            cb.CbIndex.SetHintForKey(lastHash.Hash, new KeyHint()
+            {
+                StartAddr = (ulong)currentKeyRangeStartAddr,
+                EndAddr = (ulong)outStream.Position-keyLength
+            });
+            
             //write the index out to disk
             cb.CbIndex.WriteToDisk();
+            
+            //tell cbKey to update stats
+            cb.CbKey.PostWriteUpdate();
             
             //cleanup the batch files.
             streams.Dispose();
@@ -166,6 +211,14 @@ namespace cachey_bashi
     {
         public DataAddr DataAddr;
         public byte[] Key;
+    }
+
+    class KeyDataComparer: IComparer<KeyData>
+    {
+        public int Compare(KeyData x, KeyData y)
+        {
+            return x.Key.ToHashBin(false).CompareTo(y.Key.ToHashBin(false));
+        }
     }
 
     class CurrentBatchInfo
@@ -185,20 +238,23 @@ namespace cachey_bashi
             Next();
         }
         
-        public void Next()
+        public bool Next()
         {
             if (CheckComplete())
-                return;
+            {
+                CurrentHashBin = null;
+                return false;
+            }
             
             CurrentHashBin = new HashBin(Stream, _keyLength);
             CurrentAddr.addr = Reader.ReadUInt64();
             CurrentAddr.len = Reader.ReadUInt64();
-            CheckComplete();
+            return true;
         }
 
         bool CheckComplete()
         {
-            if (Stream.Position == Stream.Length-1)
+            if (Stream.Position >= Stream.Length)
             {
                 Complete = true;
                 return true;
@@ -210,7 +266,7 @@ namespace cachey_bashi
 
     class StreamCollection: IDisposable
     {
-        public List<Stream> Streams { get; set; }
+        public List<Stream> Streams { get; set; } = new List<Stream>();
 
         public void Dispose()
         {

@@ -14,13 +14,21 @@ namespace cachey_bashi.tests
         }
 
         [Test]
-        [TestCase(16)]
-        [TestCase(32)]
-        [TestCase(64)]
-        [TestCase(17)]//will cause padding in HashBin backing array.
-        [TestCase(14)]//will cause padding in HashBin backing array.
-        [TestCase(6)]
-        public void EqualityBasic(int keyLen)
+        [TestCase(16, true)]
+        [TestCase(32, true)]
+        [TestCase(64, true)]
+        [TestCase(65, true)]
+        [TestCase(17, true)]//will cause padding in HashBin backing array.
+        [TestCase(14, true)]//will cause padding in HashBin backing array.
+        [TestCase(6, true)]
+        [TestCase(16, false)]
+        [TestCase(32, false)]
+        [TestCase(64, false)]
+        [TestCase(65, false)]
+        [TestCase(17, false)]//will cause padding in HashBin backing array.
+        [TestCase(14, false)]//will cause padding in HashBin backing array.
+        [TestCase(6, false)]
+        public void EqualityBasic(int keyLen, bool hashBinCopy)
         {
             var r = new Random(DateTime.UtcNow.Millisecond);
             var arrA = new byte[keyLen];
@@ -28,17 +36,39 @@ namespace cachey_bashi.tests
             r.NextBytes(arrA);
             r.NextBytes(arrC);
             
-            var hashA = new HashBin(arrA);
-            var hashB = new HashBin(arrA);
+            var hashA = new HashBin(arrA, hashBinCopy);
+            var hashB = new HashBin(arrA, hashBinCopy);
 
             Assert.True(hashA == hashB);
             
-            var hashC = new HashBin(arrC);
+            var hashC = new HashBin(arrC, hashBinCopy);
             Assert.False(hashA == hashC);
         }
 
         [Test]
-        public void RandTest()
+        [TestCase("ffffffffffffffff", "fffffffffffffffe", false)]
+        [TestCase("fffffffffffffffe", "ffffffffffffffff", true)]
+        [TestCase("0fffffffffffffff", "1fffffffffffffff", true)]
+        [TestCase("1ffffffffffffffe", "1fffffffffffffff", true)]
+        public void ComparisonTest(string a, string b, bool bIsGreater)
+        {
+            var hashBinA = new HashBin(a);
+            var hashBinB = new HashBin(b);
+            if (bIsGreater)
+            {
+                Assert.True(hashBinA < hashBinB);
+            }
+            else
+            {
+                Assert.False(hashBinA < hashBinB);
+            }
+        }
+        
+
+        [Test]
+        [TestCase(true)]
+        [TestCase(false)]
+        public void RandTest(bool hashBinCopy)
         {
             int count = 100000;
             
@@ -63,7 +93,7 @@ namespace cachey_bashi.tests
             for (int i = 0; i < count; i++)
             {
                 sw.Start();
-                hashBins[i] = new HashBin(randHashes[i]);
+                hashBins[i] = new HashBin(randHashes[i], hashBinCopy);
                 sw.Stop();
             }
             Console.WriteLine($"Took {sw.ElapsedMilliseconds:N2}ms to create {count:N0} HashBins");
@@ -83,7 +113,7 @@ namespace cachey_bashi.tests
             for (int i = 0; i < count; i++)
             {
                 sw.Start();
-                if (new HashBin(randHashes[i]) == hashBins[i])
+                if (new HashBin(randHashes[i], hashBinCopy) == hashBins[i])
                     matches++;
                 sw.Stop();
             }

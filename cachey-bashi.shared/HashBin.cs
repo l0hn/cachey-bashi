@@ -1,8 +1,6 @@
 using System;
-using System.Collections;
 using System.IO;
 using System.Linq;
-using System.Security.Policy;
 
 namespace cachey_bashi
 {
@@ -12,6 +10,7 @@ namespace cachey_bashi
         private int _length;
 
         public int Length => _length;
+
         public byte[] Hash => _hash;
 
         public HashBin(string hexStr)
@@ -20,33 +19,30 @@ namespace cachey_bashi
             _length = _hash.Length;
         }
         
-        public HashBin(byte[] hash)
+        public HashBin(byte[] hash, bool copy = true)
         {
             _length = hash.Length;
-            if (_length < sizeof(ulong))
+            if (copy)
             {
-                _hash = new byte[sizeof(ulong)];
-            }
-            else if (_length % sizeof(ulong) != 0)
-            {
-                //padding required.
-                _hash = new byte[_length+sizeof(ulong)];
+                _hash = new byte[hash.Length];
+                Array.Copy(hash, _hash, hash.Length);
             }
             else
             {
-                _hash = new byte[_length];    
+                _hash = hash;
             }
-            
-            Array.Copy(hash, _hash, _length);
         }
 
-        
-        
         public HashBin(Stream stream, int count)
         {
-            
+            _length = count;
+            _hash = new byte[_length];
+            var read = stream.Read(_hash, 0, count);
+            if (_length != read)
+            {
+                throw new ArgumentException($"Could not read {count} bytes from the provided stream (got: {read})");
+            }
         }
-
         
         static unsafe int Compare(HashBin a, HashBin b)
         {
@@ -63,28 +59,49 @@ namespace cachey_bashi
                 return 0;
             }
 
-            var aLen = a._hash.Length;
+            var aLen = a._length;
 
-            if (aLen < b._hash.Length)
+            if (aLen < b._length)
                 return -1;
             
-            if (aLen > b._hash.Length)
+            if (aLen > b._length)
                 return 1;
             
-            fixed (byte* pA = &a._hash[0])
-            fixed (byte* pB = &b._hash[0])
+            fixed (byte* pA = &a._hash[a._length-1])
+            fixed (byte* pB = &b._hash[b._length-1])
+            fixed (byte* pAEnd = &a._hash[0])
             {
-                ulong* pCurrentA = (ulong*)pA;
-                ulong* pCurrentB = (ulong*)pB;
-                for (int i = 0; i < aLen; i+=sizeof(ulong))
+                ulong* pCurrentA = (ulong*) (pA+1);
+                ulong* pCurrentB = (ulong*) (pB+1);
+                
+                while (pCurrentA-(ulong*)pAEnd > 0)
                 {
+                    pCurrentA -= 1;
+                    pCurrentB -= 1;
+                    
                     if (*pCurrentA < *pCurrentB)
                         return -1;
                     if (*pCurrentA > *pCurrentB)
                         return 1;
-
-                    pCurrentA++;
-                    pCurrentB++;
+                }
+                
+                if (pCurrentA == pAEnd) //this means the array was divisible by sizeof(ulong)
+                    return 0;
+                
+                //now check the remaining byte one at a time
+                //todo: could probably write a utility that tapers down from ulong > uint > ushort > byte checks but meh
+                byte* pCurrentAByte = (byte*) pCurrentA;
+                byte* pCurrentBByte = (byte*) pCurrentB;
+                
+                while (pCurrentAByte-pAEnd > 0)
+                {
+                    pCurrentAByte--;
+                    pCurrentBByte--;
+                    
+                    if (*pCurrentAByte < *pCurrentBByte)
+                        return -1;
+                    if (*pCurrentAByte > *pCurrentBByte)
+                        return 1;
                 }
             }
 
@@ -133,6 +150,16 @@ namespace cachey_bashi
                 return 1;
             
             return CompareTo(hB);
+        }
+
+        
+    }
+
+    public static class HashBinExtensions
+    {
+        public static HashBin ToHashBin(this byte[] buf, bool copy = true)
+        {
+            return new HashBin(buf, copy);
         }
     }
 }
