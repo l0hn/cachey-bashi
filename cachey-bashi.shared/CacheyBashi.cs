@@ -1,10 +1,11 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
 namespace cachey_bashi
 {
-    public class CacheyBashi
+    public class CacheyBashi: IDisposable
     {
         public string Dir { get; }
         public string DbName { get; }
@@ -35,8 +36,18 @@ namespace cachey_bashi
         public static CacheyBashi Create(string outDir, string dbName, IEnumerable<KeyValuePair<byte[], byte[]>> data, ushort keyLength, byte indexKeyLength = 2)
         {
             var cb = new CacheyBashi(outDir, dbName, keyLength, indexKeyLength, true);
-            
-            //write everything
+            CbWriter.Write(cb, keyLength, data);
+
+            return cb;
+        }
+
+        public static CacheyBashi Create(string outDir, 
+            string dbName,
+            IEnumerable<KeyValuePair<HashBin, byte[]>> data, 
+            ushort keyLength, 
+            byte indexKeyLength = 2)
+        {
+            var cb = new CacheyBashi(outDir, dbName, keyLength, indexKeyLength, true);
             CbWriter.Write(cb, keyLength, data);
 
             return cb;
@@ -79,6 +90,12 @@ namespace cachey_bashi
                 return CbData.GetValue(addr);
             }
             return null;
+        }
+
+        public void Dispose()
+        {
+            CbKey?.Dispose();
+            CbData?.Dispose();
         }
     }
 

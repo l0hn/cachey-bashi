@@ -10,7 +10,7 @@ namespace cachey_bashi.tests
     [TestFixture]
     public class CbKeyTest
     {
-        IEnumerable<KeyValuePair<byte[], byte[]>> GenerateDummyData(ushort keyLength, byte indexKeyLength)
+        IEnumerable<KeyValuePair<HashBin, byte[]>> GenerateDummyData(ushort keyLength, byte indexKeyLength)
         {
             //create some data that we can repeat later for verification
             //we need multiple items in each key space (index key length)
@@ -40,7 +40,7 @@ namespace cachey_bashi.tests
                     
                     //send it
                     var dummyDat = new DummyData("This is your dummy data", indexBuf, pattern.Hash);
-                    yield return new KeyValuePair<byte[], byte[]>(pattern.Hash, dummyDat.ToJsonBytes());
+                    yield return new KeyValuePair<HashBin, byte[]>(pattern, dummyDat.ToJsonBytes());
                     
                     //increment index bytes
                     IncrementBuf(indexBuf);
@@ -74,12 +74,11 @@ namespace cachey_bashi.tests
             //now regen the dummy data to verify it all exits
             foreach (var kvp in GenerateDummyData(16, 2))
             {
-                HashBin key = new HashBin(kvp.Key);
                 var dummyData = DummyData.FromJsonBytes(kvp.Value);
                 
-                Assert.True(cb.HasKey(key), $"key not found: {key.Hash.ToHexString()}");
+                Assert.True(cb.HasKey(kvp.Key), $"key not found: {kvp.Key}");
                 
-                var storedDummyData = DummyData.FromJsonBytes(cb.GetValue(key));
+                var storedDummyData = DummyData.FromJsonBytes(cb.GetValue(kvp.Key));
                 Assert.AreEqual(dummyData.Message, storedDummyData.Message);
                 Assert.AreEqual(dummyData.OriginalKey.ToHashBin(false), storedDummyData.OriginalKey.ToHashBin(false));
                 Assert.AreEqual(dummyData.OriginalKeyIndex.ToHashBin(false), storedDummyData.OriginalKeyIndex.ToHashBin(false));

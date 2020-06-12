@@ -13,6 +13,11 @@ namespace cachey_bashi
     {
         public static void Write(CacheyBashi cb, ushort keyLength, IEnumerable<KeyValuePair<byte[], byte[]>> data)
         {
+            Write(cb, keyLength, data.Select(i => new KeyValuePair<HashBin, byte[]>(i.Key.ToHashBin(), i.Value)));
+        }
+        
+        public static void Write(CacheyBashi cb, ushort keyLength, IEnumerable<KeyValuePair<HashBin, byte[]>> data)
+        {
             List<string> batchFiles = new List<string>();
             var batchNameFormat = Path.Combine(cb.Dir, cb.DbName) + ".keybatch_{0}";
             var batchIndex = 0;
@@ -29,8 +34,7 @@ namespace cachey_bashi
                     throw new ArgumentException($"All keys must be of the provided keyLength: {keyLength}");
                 
                 //need to copy the key array here incase someone is re-using the buffer
-                keyDataArray[index].Key = new byte[kvp.Key.Length];
-                Array.Copy(kvp.Key, keyDataArray[index].Key, keyLength);
+                keyDataArray[index].Key = kvp.Key;
                 keyDataArray[index].DataAddr.addr = (ulong)datFileIndex;
                 keyDataArray[index].DataAddr.len = (ulong)kvp.Value.Length;
                 //todo: need to write the dat file here so we can discard data from memory
@@ -70,7 +74,7 @@ namespace cachey_bashi
                 //first the keys
                 foreach (var keyData in keyDataArray)
                 {
-                    outFile.Write(keyData.Key, 0, keyData.Key.Length);
+                    outFile.Write(keyData.Key.Hash, 0, keyData.Key.Length);
                 }
                 //then the addr infos
                 foreach (var keyData in keyDataArray)
@@ -94,7 +98,7 @@ namespace cachey_bashi
             var writer = new BinaryWriter(stream);
             for (int i = 0; i < count; i++)
             {
-                stream.Write(keyDataArray[i].Key, 0, keyDataArray[i].Key.Length);
+                stream.Write(keyDataArray[i].Key.Hash, 0, keyDataArray[i].Key.Length);
                 writer.Write(keyDataArray[i].DataAddr.addr);
                 writer.Write(keyDataArray[i].DataAddr.len);
             }
@@ -210,14 +214,14 @@ namespace cachey_bashi
     struct KeyData
     {
         public DataAddr DataAddr;
-        public byte[] Key;
+        public HashBin Key;
     }
 
     class KeyDataComparer: IComparer<KeyData>
     {
         public int Compare(KeyData x, KeyData y)
         {
-            return x.Key.ToHashBin(false).CompareTo(y.Key.ToHashBin(false));
+            return x.Key.CompareTo(y.Key);
         }
     }
 
