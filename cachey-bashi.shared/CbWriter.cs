@@ -34,7 +34,7 @@ namespace cachey_bashi
                     throw new ArgumentException($"All keys must be of the provided keyLength: {keyLength}");
                 
                 //need to copy the key array here incase someone is re-using the buffer
-                keyDataArray[index].Key = kvp.Key;
+                keyDataArray[index].Key = kvp.Key.Clone();
                 keyDataArray[index].DataAddr.addr = (ulong)datFileIndex;
                 keyDataArray[index].DataAddr.len = (ulong)kvp.Value.Length;
                 //todo: need to write the dat file here so we can discard data from memory

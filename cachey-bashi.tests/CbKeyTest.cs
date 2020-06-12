@@ -27,9 +27,10 @@ namespace cachey_bashi.tests
             foreach (var keyspace in keyspaces)
             {
                 var indexBuf = new byte[indexKeyLength];
-                var pattern = new HashBin("".PadLeft(32, keyspace));
+                
                 for (int i = 0; i < numIndexes; i++)
                 {
+                    var pattern = new HashBin("".PadLeft(32, keyspace));
                     //set index on key
                     Array.Copy(indexBuf, 0, pattern.Hash, pattern.Hash.Length-indexBuf.Length, indexBuf.Length);
                     //
@@ -70,11 +71,16 @@ namespace cachey_bashi.tests
             var dir = Path.GetTempPath();
             var dbName = "cbunittest";
             var cb = CacheyBashi.Create(dir, dbName, GenerateDummyData(16, 2), 16, 2);
-            var debugSearch = new HashBin("0000000000000000000000000000d8f4");
+            // var debugSearch = new HashBin("ffffffffffffffffffffffffffff0000");
             //now regen the dummy data to verify it all exits
             foreach (var kvp in GenerateDummyData(16, 2))
             {
                 var dummyData = DummyData.FromJsonBytes(kvp.Value);
+
+                // if (kvp.Key == debugSearch)
+                // {
+                //     Console.WriteLine("DebugMe");
+                // }
                 
                 Assert.True(cb.HasKey(kvp.Key), $"key not found: {kvp.Key}");
                 

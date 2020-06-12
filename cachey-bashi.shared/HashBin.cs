@@ -193,7 +193,11 @@ namespace cachey_bashi
             return CompareTo(hB);
         }
 
-        
+
+        public HashBin Clone()
+        {
+            return new HashBin(_hash, true);
+        }
     }
 
     public static class HashBinExtensions

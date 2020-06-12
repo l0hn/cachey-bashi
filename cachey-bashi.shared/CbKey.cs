@@ -134,7 +134,7 @@ namespace cachey_bashi
             FileStream.Position = (long)hint.StartAddr;
             
             var rangeSize = hint.EndAddr - hint.StartAddr;
-            var remaining = (long)rangeSize;
+            var remaining = (long)rangeSize+_keyLength;
             long lastRead;
             int amountToRead;
             var bufReadPos = 0;
@@ -143,25 +143,27 @@ namespace cachey_bashi
                 amountToRead = (int)(remaining < _readBuffer.Length ? remaining : _readBuffer.Length);
                 lastRead = FileStream.Read(_readBuffer, 0, amountToRead);
                 remaining -= lastRead;
+                bufReadPos = 0;
                 //loop until buffer read
                 while (bufReadPos < lastRead)
                 {
                     _readBinBuffer.SetFromPartialArray(_readBuffer, bufReadPos, _keyLength, false);
-                    bufReadPos += _keyLength;
 
                     if (_readBinBuffer == key)
                     {
                         if (getDataAddr)
                         {
-                            var foundLocation = (ulong)FileStream.Position - _keyLength;
-                            FileStream.Position = (long)((((foundLocation) / _keyLength) << 4) + _keyEnd + HeaderLength);
+                            var foundLocation = FileStream.Position - lastRead + bufReadPos;
+                            FileStream.Position = ((((foundLocation) / _keyLength) << 4) + (long)_keyEnd + (long)HeaderLength);
                             dataAddr.addr = _reader.ReadUInt64();
                             dataAddr.len = _reader.ReadUInt64();
                         }
 
                         return true;
                     }
+                    bufReadPos += _keyLength;
                 }
+                
             }
             return false;
         }
