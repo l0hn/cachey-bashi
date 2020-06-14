@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace cachey_bashi
 {
@@ -15,20 +17,20 @@ namespace cachey_bashi
         public byte[] Hash => _hash;
 
         private int _partialStart;
-        private int _partialEnd;
+        // private int _partialEnd;
         
         
         public HashBin(string hexStr)
         {
             _hash = hexStr.HexToBytes();
             _length = _hash.Length;
-            _partialEnd = _length - 1;
+            // _partialEnd = _length - 1;
         }
         
         public HashBin(byte[] hash, bool copy = true)
         {
             _length = hash.Length;
-            _partialEnd = _length - 1;
+            // _partialEnd = _length - 1;
             if (copy)
             {
                 _hash = new byte[hash.Length];
@@ -43,7 +45,7 @@ namespace cachey_bashi
         public HashBin(Stream stream, int count)
         {
             _length = count;
-            _partialEnd = _length - 1;
+            // _partialEnd = _length - 1;
             _hash = new byte[_length];
 #if DEBUG
             var sw = new Stopwatch();
@@ -74,32 +76,36 @@ namespace cachey_bashi
             {
                 Array.Copy(array, start, _hash, 0, count);
                 _length = count;
-                _partialEnd = count - 1;
+                // _partialEnd = count - 1;
                 return;
             }
 
             _hash = array;
             _length = count;
-            _partialEnd = start + count - 1;
+            // _partialEnd = start + count - 1;
             _partialStart = start;
         }
-        
-        
-        static unsafe int Compare(HashBin a, HashBin b)
+
+        public void SetPartialIndexes(int start)
         {
-            if (a is null & !(b is null))
-                return -1;
+            _partialStart = start;
+            // _partialEnd = start + _length;
+        }
 
-            if (b is null & !(a is null))
-            {
+
+        static int Compare(HashBin a, HashBin b)
+        {
+            return UnsafeCompare(a, b);
+        }
+        
+        static int SafeCompare(HashBin a, HashBin b)
+        {
+            if (a is null)
+                return b is null ? 0 : -1;
+
+            if (b is null)
                 return 1;
-            }
             
-            if (a is null && b is null)
-            {
-                return 0;
-            }
-
             var aLen = a._length;
 
             if (aLen < b._length)
@@ -107,44 +113,87 @@ namespace cachey_bashi
             
             if (aLen > b._length)
                 return 1;
+
+            byte nextA;
+            byte nextB;
             
-            fixed (byte* pA = &a._hash[a._partialEnd])
-            fixed (byte* pB = &b._hash[b._partialEnd])
-            fixed (byte* pAEnd = &a._hash[a._partialStart])
+            for (int i = aLen-1; i >= 0; i--)
             {
-                ulong* pCurrentA = (ulong*) (pA+1);
-                ulong* pCurrentB = (ulong*) (pB+1);
-                
-                while (pCurrentA-(ulong*)pAEnd > 0)
-                {
-                    pCurrentA -= 1;
-                    pCurrentB -= 1;
-                    
-                    if (*pCurrentA < *pCurrentB)
-                        return -1;
-                    if (*pCurrentA > *pCurrentB)
-                        return 1;
-                }
-                
-                if (pCurrentA == pAEnd) //this means the array was divisible by sizeof(ulong)
-                    return 0;
-                
-                //now check the remaining byte one at a time
-                //todo: could probably write a utility that tapers down from ulong > uint > ushort > byte checks but meh
-                byte* pCurrentAByte = (byte*) pCurrentA;
-                byte* pCurrentBByte = (byte*) pCurrentB;
-                
-                while (pCurrentAByte-pAEnd > 0)
-                {
-                    pCurrentAByte--;
-                    pCurrentBByte--;
-                    
-                    if (*pCurrentAByte < *pCurrentBByte)
-                        return -1;
-                    if (*pCurrentAByte > *pCurrentBByte)
-                        return 1;
-                }
+                nextA = a._hash[i + a._partialStart];
+                nextB = b._hash[i + b._partialStart];
+                if (nextA > nextB)
+                    return 1;
+                if (nextA < nextB)
+                    return -1;
             }
+
+            return 0;
+        }
+
+        static unsafe int UnsafeCompare(HashBin a, HashBin b)
+        {
+            if (a is null)
+                return b is null ? 0 : -1;
+
+            if (b is null)
+                return 1;
+
+            if (a._length == b._length)
+            {
+                // ulong* nextAlong;
+                // ulong* nextBLong;
+                byte* nextA;
+                byte* nextB;
+                int remain = a._length;
+                int aOffset = a._partialStart + a._length - (remain > 7 ? 8 : 1);
+                int bOffset = b._partialStart + b._length - (remain > 7 ? 8 : 1);
+                
+                fixed (byte* pA = &a._hash[aOffset], pB = &b._hash[bOffset])
+                {
+                    nextA = pA;
+                    nextB = pB;
+
+                    while (remain > 0)
+                    {
+                        if (remain>7)
+                        {
+                            if (*(ulong*)nextA == *(ulong*)nextB)
+                            {
+                                nextA -= 8;
+                                nextB -= 8;
+                                remain -= 8;
+                                continue;
+                            }
+
+                            if (*(ulong*)nextA > *(ulong*)nextB)
+                                return 1;
+
+                            return -1;
+                        }
+
+                        if (*nextA == *nextB)
+                        {
+                            nextA--;
+                            nextB--;
+                            remain--;
+                            continue;
+                        }
+
+                        if (*nextA > *nextB)
+                            return 1;
+
+                        return -1;
+                    }
+                }
+
+                return 0;
+            }
+
+            if (a._length < b._length)
+                return -1;
+            
+            if (a._length > b._length)
+                return 1;
 
             return 0;
         }

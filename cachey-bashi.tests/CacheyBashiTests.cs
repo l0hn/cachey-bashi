@@ -28,17 +28,20 @@ namespace cachey_bashi.tests
             var dbName = "cbunittest_reload";
             var sw = new Stopwatch();
             sw.Start();
-            var cb = CacheyBashi.Create(dir, dbName, junkData, 16);
+            var cb = CacheyBashi.Create(dir, dbName, junkData, 16, 2);
             sw.Stop();
             
-            Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to create CacheBachi DB with {junkData.Count} key/value pairs");
+            Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to create CacheBashi DB with {junkData.Count} key/value pairs");
 
+            
             cb.Dispose();
-            sw.Start();
-            cb = CacheyBashi.Load(dir, dbName, 16);
+            sw.Restart();
+            cb = CacheyBashi.Load(dir, dbName, 16, 2);
             sw.Stop();
             
-            Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to load CacheBachi DB from disk with {junkData.Count} key/value pairs");
+            Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to load CacheBashi DB from disk with {junkData.Count} key/value pairs");
+            
+            sw.Reset();
             
             foreach (var junk in junkData)
             {
@@ -49,6 +52,8 @@ namespace cachey_bashi.tests
             
             Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to check if {junkData.Count:N} keys exist (where all keys exist)");
 
+            sw.Reset();
+            
             foreach (var junk in junkData)
             {
                 sw.Start();

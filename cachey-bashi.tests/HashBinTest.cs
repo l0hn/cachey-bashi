@@ -131,6 +131,22 @@ namespace cachey_bashi.tests
             }
             Console.WriteLine($"Took {sw.ElapsedMilliseconds:N2}ms to compare {count:N0} Hash Strings (matches={matches:N0})");
             Assert.AreEqual(count, matches);
+            
+            
+            //less than comparisons:
+            sw.Reset();
+            Console.WriteLine($"Comparing {count:N0} HashBins with < operator");
+            matches = 0;
+            for (int i = 0; i < count; i++)
+            {
+                int checkIndex = i + 1 < randHashes.Count - 1 ? i + 1 : i;
+                sw.Start();
+                if (randHashes[i].ToHashBin(hashBinCopy) < randHashes[checkIndex].ToHashBin(hashBinCopy))
+                    matches++;
+                sw.Stop();
+            }
+            Console.WriteLine($"Took {sw.ElapsedMilliseconds:N2}ms to compare {count:N0} HashBins with < operator (matches={matches:N0})");
+            
         }
 
         [Test]
@@ -140,6 +156,39 @@ namespace cachey_bashi.tests
         {
             var hb = new HashBin(md5);
             Assert.AreEqual(md5.ToLower(), hb.ToString());
+        }
+
+        [Test]
+        public void MemTest()
+        {
+            var buf = new byte[16 * 10000];
+            var r = new Random();
+            r.NextBytes(buf);
+            var hashBuf = new HashBin(new byte[16]);
+            hashBuf.SetFromPartialArray(buf, 0, 16, false);
+            var hashBufCompare = new HashBin("e96c9661d2f7887a14264ee5986ea66d");
+            
+            var swSet = new Stopwatch();
+            var swCompare = new Stopwatch();
+            var matches = 0;
+            for (int i = 0; i < 1000000; i++)
+            {
+                var next = r.Next(0, buf.Length - 17);
+                swSet.Start();
+                hashBuf.SetPartialIndexes(next);
+                swSet.Stop();
+                swCompare.Start();
+                var match = hashBuf < hashBufCompare;
+                swCompare.Stop();
+                if (match)
+                {
+                    matches++;
+                }
+            }
+            
+            Console.WriteLine($"Took: {swSet.ElapsedMilliseconds:N} to set partials");
+            Console.WriteLine($"Took: {swCompare.ElapsedMilliseconds:N} to compare partials");
+            
         }
     }
 }

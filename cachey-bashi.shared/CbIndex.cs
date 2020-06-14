@@ -101,6 +101,13 @@ namespace cachey_bashi
         public unsafe void SetHintForKey(byte[] key, KeyHint hint)
         {
             var index = GetKeyIndexFromKey(key);
+#if DEBUG
+            if (index > _indexData.Length-1)
+            {
+                Console.WriteLine("DebugMe");   
+            }
+#endif
+            
             fixed (byte* pIndex = &_indexData[index])
             {
                 (*(KeyHint*) pIndex) = hint;

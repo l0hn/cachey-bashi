@@ -37,6 +37,7 @@ namespace cachey_bashi
             _reader = new BinaryReader(FileStream);
             _readBuffer = new byte[_keyLength*10000];
             _readBinBuffer = new HashBin(new byte[_keyLength], false);
+            _readBinBuffer.SetFromPartialArray(_readBuffer, 0, _keyLength, false);
 
             if (FileStream.Length > 8)
             {
@@ -147,8 +148,8 @@ namespace cachey_bashi
                 //loop until buffer read
                 while (bufReadPos < lastRead)
                 {
-                    _readBinBuffer.SetFromPartialArray(_readBuffer, bufReadPos, _keyLength, false);
-
+                    _readBinBuffer.SetPartialIndexes(bufReadPos);
+                    
                     if (_readBinBuffer == key)
                     {
                         if (getDataAddr)
@@ -161,6 +162,7 @@ namespace cachey_bashi
 
                         return true;
                     }
+
                     bufReadPos += _keyLength;
                 }
                 

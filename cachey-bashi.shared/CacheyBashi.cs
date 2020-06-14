@@ -53,9 +53,9 @@ namespace cachey_bashi
             return cb;
         }
 
-        public static CacheyBashi Load(string dir, string dbName, ushort keyLength)
+        public static CacheyBashi Load(string dir, string dbName, ushort keyLength, byte indexKeyLength)
         {
-            var cb = new CacheyBashi(dir, dbName, keyLength);
+            var cb = new CacheyBashi(dir, dbName, keyLength, indexKeyLength);
             return cb;
         }
 
