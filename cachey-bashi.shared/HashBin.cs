@@ -7,7 +7,8 @@ using System.Text;
 
 namespace cachey_bashi
 {
-    public class HashBin: IComparable, IComparable<HashBin>
+    //todo: when using pointers or partial arrays, Hash property is invalid, need to fix.
+    public unsafe class HashBin: IComparable, IComparable<HashBin>
     {
         private byte[] _hash;
         private int _length;
@@ -17,6 +18,8 @@ namespace cachey_bashi
         public byte[] Hash => _hash;
 
         private int _partialStart;
+
+        public byte* PStart { get; private set; }
         // private int _partialEnd;
         
         
@@ -92,6 +95,11 @@ namespace cachey_bashi
             // _partialEnd = start + _length;
         }
 
+        public void SetPointer(byte* pStart, int count)
+        {
+            PStart = pStart;
+            _length = count;
+        }
 
         static int Compare(HashBin a, HashBin b)
         {
@@ -130,6 +138,41 @@ namespace cachey_bashi
             return 0;
         }
 
+        static int ArrayPtrCompare(byte* arrA, byte* arrB, int count)
+        {
+            // byte* nextA = arrA + count - (count > 7 ? 8 : 1);
+            // byte* nextB = arrB + count - (count > 7 ? 8 : 1);
+            while (count > 0)
+            {
+                if (count>7)
+                {
+                    count -= 8;
+                    if (*(ulong*)(arrA+count) == *(ulong*)(arrB+count))
+                    {
+                        continue;
+                    }
+
+                    if (*(ulong*)(arrA+count) > *(ulong*)(arrB+count))
+                        return 1;
+
+                    return -1;
+                }
+
+                count--;
+                if (arrA[count] == arrB[count])
+                {
+                    continue;
+                }
+
+                if (arrA[count] > arrB[count])
+                    return 1;
+
+                return -1;
+            }
+
+            return 0;
+        }
+        
         static unsafe int UnsafeCompare(HashBin a, HashBin b)
         {
             if (a is null)
@@ -140,53 +183,31 @@ namespace cachey_bashi
 
             if (a._length == b._length)
             {
-                // ulong* nextAlong;
-                // ulong* nextBLong;
-                byte* nextA;
-                byte* nextB;
-                int remain = a._length;
-                int aOffset = a._partialStart + a._length - (remain > 7 ? 8 : 1);
-                int bOffset = b._partialStart + b._length - (remain > 7 ? 8 : 1);
-                
-                fixed (byte* pA = &a._hash[aOffset], pB = &b._hash[bOffset])
+                if (a.PStart != (byte*)0 && b.PStart != (byte*)0)
                 {
-                    nextA = pA;
-                    nextB = pB;
-
-                    while (remain > 0)
+                    return ArrayPtrCompare(a.PStart, b.PStart, a._length);
+                }
+                if (a.PStart == (byte*)0 && b.PStart != (byte*)0)
+                {
+                    fixed (byte* aStart = &a._hash[a._partialStart])
                     {
-                        if (remain>7)
-                        {
-                            if (*(ulong*)nextA == *(ulong*)nextB)
-                            {
-                                nextA -= 8;
-                                nextB -= 8;
-                                remain -= 8;
-                                continue;
-                            }
-
-                            if (*(ulong*)nextA > *(ulong*)nextB)
-                                return 1;
-
-                            return -1;
-                        }
-
-                        if (*nextA == *nextB)
-                        {
-                            nextA--;
-                            nextB--;
-                            remain--;
-                            continue;
-                        }
-
-                        if (*nextA > *nextB)
-                            return 1;
-
-                        return -1;
+                        return ArrayPtrCompare(aStart, b.PStart, a._length);    
                     }
                 }
-
-                return 0;
+                if (a.PStart != (byte*)0 && b.PStart == (byte*)0)
+                {
+                    fixed (byte* bStart = &b._hash[b._partialStart])
+                    {
+                        return ArrayPtrCompare(a.PStart, bStart, a._length);    
+                    }
+                }
+                
+                fixed (
+                    byte* pA = &a._hash[a._partialStart],
+                    pB = &b._hash[b._partialStart])
+                {
+                    return ArrayPtrCompare(pA, pB, a._length);
+                }
             }
 
             if (a._length < b._length)
@@ -200,9 +221,77 @@ namespace cachey_bashi
         
         public static unsafe bool operator ==(HashBin a, HashBin b)
         {
-            return Compare(a, b) == 0;
+            return UnsafeAreEqual(a, b, 0);
         }
 
+        private static byte* _nullPtr = (byte*) 0;
+        
+        public static bool UnsafeAreEqual(HashBin a, HashBin b, int count)
+        {
+            if (a is null && b is null)
+                return true;
+
+            if (a is null || b is null)
+                return false;
+
+            if (a._length != b._length)
+            {
+                return false;
+            }
+
+            count = count > 0 ? count : a._length;
+            
+            if (a.PStart != _nullPtr && b.PStart != _nullPtr)
+            {
+                return ArrayPtrEqualCompare(a.PStart, b.PStart, count);
+            }
+
+            if (a.PStart == _nullPtr && b.PStart == _nullPtr)
+            {
+                fixed (byte* aStart = &a._hash[0], bStart = &b._hash[0])
+                {
+                    return ArrayPtrEqualCompare(aStart, bStart, count);
+                }
+            }
+            
+            if (a.PStart == _nullPtr)
+            {
+                fixed (byte* aStart = &a._hash[0])
+                {
+                    return ArrayPtrEqualCompare(aStart, b.PStart, count);
+                }
+            }
+            
+            fixed (byte* bStart = &a._hash[0])
+            {
+                return ArrayPtrEqualCompare(a.PStart, bStart, count);
+            }
+        }
+
+        public static bool ArrayPtrEqualCompare(byte* a, byte* b, int count)
+        {
+            for (int i = 0; i < count;)
+            {
+                if (count-i > 7)
+                {
+                    if (*(long*)(a+i) != *(long*)(b+i))
+                    {
+                        return false;
+                    }
+
+                    i += 8;
+                    continue;
+                }
+                if (a[i] != b[i])
+                {
+                    return false;
+                }
+
+                i++;
+            }
+            return true;
+        }
+        
         public static bool operator !=(HashBin a, HashBin b)
         {
             return !(a == b);
@@ -243,9 +332,9 @@ namespace cachey_bashi
         }
 
 
-        public HashBin Clone()
+        public HashBin Clone(bool shallow = false)
         {
-            return new HashBin(_hash, true);
+            return new HashBin(_hash, !shallow);
         }
     }
 

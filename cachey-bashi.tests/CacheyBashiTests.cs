@@ -48,6 +48,7 @@ namespace cachey_bashi.tests
                 sw.Start();
                 var hasKey = cb.HasKey(junk.Key);
                 sw.Stop();
+                Assert.True(hasKey);
             }
             
             Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to check if {junkData.Count:N} keys exist (where all keys exist)");
@@ -59,6 +60,7 @@ namespace cachey_bashi.tests
                 sw.Start();
                 var value = cb.GetValue(junk.Key);
                 sw.Stop();
+                Assert.AreEqual(value.ToHashBin(false), junk.Key);
             }
             
             Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to fetch {junkData.Count:N} values (where all keys exist)");

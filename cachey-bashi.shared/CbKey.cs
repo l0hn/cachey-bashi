@@ -2,13 +2,14 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Runtime.InteropServices;
 
 namespace cachey_bashi
 {
     /// <summary>
     /// Responsible for managing access to the key file
     /// </summary>
-    public class CbKeyFixed: IDisposable
+    public unsafe class CbKeyFixed: IDisposable
     {
         private string _file;
         private ulong _count;
@@ -20,6 +21,8 @@ namespace cachey_bashi
         private ulong _ulongSize;
         private byte[] _readBuffer;
         private HashBin _readBinBuffer;
+        private GCHandle _readBufferHandle;
+        private byte* _readBufferPtr;
         internal ulong HeaderLength { get; }
 
         public CbKeyFixed(string keyFile, ushort keyLength = 16, bool createNew = false)
@@ -36,6 +39,8 @@ namespace cachey_bashi
             FileStream = File.Open(_file, FileMode.OpenOrCreate);
             _reader = new BinaryReader(FileStream);
             _readBuffer = new byte[_keyLength*10000];
+            _readBufferHandle = GCHandle.Alloc(_readBuffer, GCHandleType.Pinned);
+            _readBufferPtr = (byte*) _readBufferHandle.AddrOfPinnedObject();
             _readBinBuffer = new HashBin(new byte[_keyLength], false);
             _readBinBuffer.SetFromPartialArray(_readBuffer, 0, _keyLength, false);
 
@@ -118,14 +123,13 @@ namespace cachey_bashi
         
         public bool HasKeyFast(HashBin key, out DataAddr dataAddr, bool getDataAddr = false, KeyHint hint = default(KeyHint))
         {
-            dataAddr = new DataAddr();
             if (key.Length != _keyLength)
                 throw new ArgumentException($"Key must be {_keyLength} bytes");
 
             bool hasHint = hint.StartAddr >= _keyStart && 
-                           hint.EndAddr > hint.StartAddr 
+                           hint.EndAddr >= hint.StartAddr 
                            && hint.EndAddr <= _keyEnd;
-
+            
             if (!hasHint)
             {
                 hint.StartAddr = _keyStart;
@@ -139,34 +143,40 @@ namespace cachey_bashi
             long lastRead;
             int amountToRead;
             var bufReadPos = 0;
-            while (remaining > 0) 
+            fixed (byte* ptrKey = &key.Hash[0])
             {
-                amountToRead = (int)(remaining < _readBuffer.Length ? remaining : _readBuffer.Length);
-                lastRead = FileStream.Read(_readBuffer, 0, amountToRead);
-                remaining -= lastRead;
-                bufReadPos = 0;
-                //loop until buffer read
-                while (bufReadPos < lastRead)
+                while (remaining > 0) 
                 {
-                    _readBinBuffer.SetPartialIndexes(bufReadPos);
-                    
-                    if (_readBinBuffer == key)
+                    amountToRead = (int)(remaining < _readBuffer.Length ? remaining : _readBuffer.Length);
+                    lastRead = FileStream.Read(_readBuffer, 0, amountToRead);
+                    remaining -= lastRead;
+                    bufReadPos = 0;
+                    //loop until buffer read
+                    while (bufReadPos < lastRead)
                     {
-                        if (getDataAddr)
+                        if (HashBin.ArrayPtrEqualCompare(ptrKey, _readBufferPtr+bufReadPos, _keyLength))
                         {
-                            var foundLocation = FileStream.Position - lastRead + bufReadPos;
-                            FileStream.Position = ((((foundLocation) / _keyLength) << 4) + (long)_keyEnd + (long)HeaderLength);
-                            dataAddr.addr = _reader.ReadUInt64();
-                            dataAddr.len = _reader.ReadUInt64();
+                            if (getDataAddr)
+                            {
+                                var foundLocation = FileStream.Position - lastRead + bufReadPos;
+                                FileStream.Position = ((((foundLocation) / _keyLength) << 4) + (long)_keyEnd + (long)HeaderLength);
+                                dataAddr = new DataAddr();
+                                dataAddr.addr = _reader.ReadUInt64();
+                                dataAddr.len = _reader.ReadUInt64();
+                                return true;
+                            }
+
+                            dataAddr = default;
+                            return true;
                         }
 
-                        return true;
+                        bufReadPos += _keyLength;
                     }
-
-                    bufReadPos += _keyLength;
-                }
                 
+                }
             }
+
+            dataAddr = default;
             return false;
         }
 
