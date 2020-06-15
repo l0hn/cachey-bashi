@@ -14,7 +14,7 @@ namespace cachey_bashi.tests
         {
             var r = new Random(DateTime.UtcNow.Millisecond);
             List<KeyValuePair<HashBin, byte[]>> junkData = new List<KeyValuePair<HashBin, byte[]>>();
-            for (int i = 0; i < 200000; i++)
+            for (int i = 0; i < 1000000; i++)
             {
                 var buf = new byte[16];
                 r.NextBytes(buf);
@@ -64,6 +64,7 @@ namespace cachey_bashi.tests
             }
             
             Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to fetch {junkData.Count:N} values (where all keys exist)");
+            Console.WriteLine($"out dir: {dir}");
         }
     }
 
