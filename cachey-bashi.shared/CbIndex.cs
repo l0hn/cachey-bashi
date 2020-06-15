@@ -13,7 +13,7 @@ namespace cachey_bashi
         private byte[] _indexData;
 
         private string _file;
-        private byte _indexKeyLen;
+        internal byte IndexKeyLen { get; private set; }
 
         private int _requiredDatLength;
 
@@ -27,11 +27,11 @@ namespace cachey_bashi
                 throw new ArgumentException($"Index key length cannot be larger than {sizeof(ulong)}");
             
             _file = indexFile;
-            _indexKeyLen = indexKeyLen;
+            IndexKeyLen = indexKeyLen;
             _requiredDatLength = CalculateRequiredLength();
             _indexData = new byte[_requiredDatLength];
-            _indexData[0] = _indexKeyLen;
-            _keyShift = (_ulongSize - (_indexKeyLen))*8;
+            _indexData[0] = IndexKeyLen;
+            _keyShift = (_ulongSize - (IndexKeyLen))*8;
             if (overwriteNew)
             {
                 File.Delete(indexFile);
@@ -50,7 +50,7 @@ namespace cachey_bashi
         int CalculateRequiredLength()
         {
             //max number representable by index key byte size
-            var maxAddrCount = MaxIndexesForIndexLength(_indexKeyLen);
+            var maxAddrCount = MaxIndexesForIndexLength(IndexKeyLen);
             return (int)(maxAddrCount * (sizeof(ulong)*2)) + 1;
         }
         
@@ -67,7 +67,7 @@ namespace cachey_bashi
             //todo: read the file
             using var file = File.Open(_file, FileMode.Open);
             using var reader = new BinaryReader(file);
-            _indexKeyLen = reader.ReadByte();
+            IndexKeyLen = reader.ReadByte();
             _requiredDatLength = CalculateRequiredLength();
             if (file.Length != _requiredDatLength)
             {
@@ -121,7 +121,7 @@ namespace cachey_bashi
         
         public unsafe int GetKeyIndexFromKey(byte[] key)
         {
-            if (key.Length < _indexKeyLen)
+            if (key.Length < IndexKeyLen)
             {
                 throw new ArgumentException("key must be larger than the key index");
             }
@@ -140,9 +140,9 @@ namespace cachey_bashi
             else
             {
                 //they key isn't long enough for us to cast to ulong so loop through bytes
-                for (int i = 0; i < _indexKeyLen; i++)
+                for (int i = 0; i < IndexKeyLen; i++)
                 {
-                    var nextByte = key[i + key.Length - _indexKeyLen];
+                    var nextByte = key[i + key.Length - IndexKeyLen];
                     indexLocation += nextByte << (i<<3);
                 }
                 indexLocation <<= 4;//multiple by 16 (ulong is 8 bytes and there's 2 per index)

@@ -138,7 +138,7 @@ namespace cachey_bashi
             return 0;
         }
 
-        static int ArrayPtrCompare(byte* arrA, byte* arrB, int count)
+        public static int ArrayPtrCompare(byte* arrA, byte* arrB, int count)
         {
             // byte* nextA = arrA + count - (count > 7 ? 8 : 1);
             // byte* nextB = arrB + count - (count > 7 ? 8 : 1);
@@ -151,10 +151,10 @@ namespace cachey_bashi
                     {
                         continue;
                     }
-
+                
                     if (*(ulong*)(arrA+count) > *(ulong*)(arrB+count))
                         return 1;
-
+                
                     return -1;
                 }
 

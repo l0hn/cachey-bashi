@@ -71,78 +71,37 @@ namespace cachey_bashi
             return HasKey(key, out var unused, false, hint);
         }
 
-        public bool GetKeyDataAddr(HashBin key, out DataAddr dataAddr, KeyHint hint = default(KeyHint))
+        public bool GetKeyDataAddr(HashBin key, out DataAddr dataAddr, KeyHint hint = default(KeyHint), byte skipBytes = 0)
         {
-            return HasKey(key, out dataAddr, true, hint);
+            return HasKey(key, out dataAddr, true, hint, skipBytes);
         }
 
-
-        public bool HasKey(HashBin key, out DataAddr dataAddr, bool getDataAddr, KeyHint hint = default(KeyHint))
-        {
-            return HasKeyFast(key, out dataAddr, getDataAddr, hint);
-        }
-        
-        public bool HasKeySlow(HashBin key, out DataAddr dataAddr, bool getDataAddr = false, KeyHint hint = default(KeyHint))
-        {
-            dataAddr = new DataAddr();
-            if (key.Length != _keyLength)
-                throw new ArgumentException($"Key must be {_keyLength} bytes");
-
-            bool hasHint = hint.StartAddr >= _keyStart && 
-                           hint.EndAddr > hint.StartAddr 
-                           && hint.EndAddr <= _keyEnd;
-
-            if (!hasHint)
-            {
-                hint.StartAddr = _keyStart;
-                hint.EndAddr = _keyEnd;
-            }
-
-            FileStream.Position = (long)hint.StartAddr;
-
-            //This is horrifically slow: need to load chunks of data into memory and read from there instead
-            while (FileStream.Position <= (long)hint.EndAddr)
-            {
-                var currentHashBin = new HashBin(FileStream, _keyLength);
-
-                if (currentHashBin == key)
-                {
-                    if (getDataAddr)
-                    {
-                        var foundLocation = (ulong)FileStream.Position - _keyLength;
-                        FileStream.Position = (long)((((foundLocation) / _keyLength) << 4) + _keyEnd + HeaderLength);
-                        dataAddr.addr = _reader.ReadUInt64();
-                        dataAddr.len = _reader.ReadUInt64();
-                    }
-
-                    return true;
-                }
-            }
-            return false;
-        }
-        
-        public bool HasKeyFast(HashBin key, out DataAddr dataAddr, bool getDataAddr = false, KeyHint hint = default(KeyHint))
+        public bool HasKey(HashBin key, out DataAddr dataAddr, bool getDataAddr = false, KeyHint hint = default(KeyHint), byte skipBytes = 0)
         {
             if (key.Length != _keyLength)
                 throw new ArgumentException($"Key must be {_keyLength} bytes");
 
-            bool hasHint = hint.StartAddr >= _keyStart && 
-                           hint.EndAddr >= hint.StartAddr 
-                           && hint.EndAddr <= _keyEnd;
+            // bool hasHint = hint.StartAddr >= _keyStart && 
+            //                hint.EndAddr >= hint.StartAddr 
+            //                && hint.EndAddr <= _keyEnd;
+
+            int compareLength = _keyLength-skipBytes;
             
-            if (!hasHint)
+            if (!(hint.StartAddr >= _keyStart && 
+                  hint.EndAddr >= hint.StartAddr 
+                  && hint.EndAddr <= _keyEnd))
             {
                 hint.StartAddr = _keyStart;
                 hint.EndAddr = _keyEnd;
+                compareLength = _keyLength;
             }
 
             FileStream.Position = (long)hint.StartAddr;
-            
-            var rangeSize = hint.EndAddr - hint.StartAddr;
-            var remaining = (long)rangeSize+_keyLength;
+            var remaining = (long)(hint.EndAddr - hint.StartAddr +_keyLength);
             long lastRead;
             int amountToRead;
             var bufReadPos = 0;
+            int compareRes;
             fixed (byte* ptrKey = &key.Hash[0])
             {
                 while (remaining > 0) 
@@ -154,7 +113,11 @@ namespace cachey_bashi
                     //loop until buffer read
                     while (bufReadPos < lastRead)
                     {
-                        if (HashBin.ArrayPtrEqualCompare(ptrKey, _readBufferPtr+bufReadPos, _keyLength))
+                        //_readBinBuffer.SetPointer(_readBufferPtr+bufReadPos, _keyLength);
+                        //compareRes = _readBinBuffer.CompareTo(key);
+                        compareRes = HashBin.ArrayPtrCompare(_readBufferPtr + bufReadPos, ptrKey, compareLength);
+
+                        if (compareRes == 0)
                         {
                             if (getDataAddr)
                             {
@@ -169,6 +132,31 @@ namespace cachey_bashi
                             dataAddr = default;
                             return true;
                         }
+
+                        if (compareRes == 1)
+                        {
+                            dataAddr = default;
+                            return false;
+                        }
+                        //
+                        // if (HashBin.ArrayPtrEqualCompare(ptrKey, _readBufferPtr+bufReadPos, compareLength))
+                        // {
+                        //     if (getDataAddr)
+                        //     {
+                        //         var foundLocation = FileStream.Position - lastRead + bufReadPos;
+                        //         FileStream.Position = ((((foundLocation) / _keyLength) << 4) + (long)_keyEnd + (long)HeaderLength);
+                        //         dataAddr = new DataAddr();
+                        //         dataAddr.addr = _reader.ReadUInt64();
+                        //         dataAddr.len = _reader.ReadUInt64();
+                        //         return true;
+                        //     }
+                        //
+                        //     dataAddr = default;
+                        //     return true;
+                        // }
+
+                        
+                        
 
                         bufReadPos += _keyLength;
                     }

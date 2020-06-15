@@ -67,7 +67,7 @@ namespace cachey_bashi
         public bool HasKey(HashBin key)
         {
             var hint = CbIndex.GetAddressHintForKey(key);
-            return CbKey.HasKey(key, hint);
+            return CbKey.HasKey(key, out var unused, false, hint, CbIndex.IndexKeyLen);
         }
 
         public bool IndexHasKeySpaceForKey(byte[] key)
@@ -84,7 +84,7 @@ namespace cachey_bashi
         public byte[] GetValue(HashBin key)
         {
             var hint = CbIndex.GetAddressHintForKey(key);
-            bool found = CbKey.GetKeyDataAddr(key, out var addr, hint);
+            bool found = CbKey.GetKeyDataAddr(key, out var addr, hint, CbIndex.IndexKeyLen);
             if (found)
             {
                 return CbData.GetValue(addr);
