@@ -13,12 +13,15 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
+		ReleaseNetCore|Any CPU = ReleaseNetCore|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.ReleaseNetCore|Any CPU.ActiveCfg = Release|Any CPU
+		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.ReleaseNetCore|Any CPU.Build.0 = Release|Any CPU
 		{0F366F88-DA78-4981-A01B-6A42BA1DD19A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0F366F88-DA78-4981-A01B-6A42BA1DD19A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F366F88-DA78-4981-A01B-6A42BA1DD19A}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -27,5 +30,7 @@ Global
 		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.ReleaseNetCore|Any CPU.ActiveCfg = Release|Any CPU
+		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.ReleaseNetCore|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

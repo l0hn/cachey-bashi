@@ -140,8 +140,6 @@ namespace cachey_bashi
 
         public static int ArrayPtrCompare(byte* arrA, byte* arrB, int count)
         {
-            // byte* nextA = arrA + count - (count > 7 ? 8 : 1);
-            // byte* nextB = arrB + count - (count > 7 ? 8 : 1);
             while (count > 0)
             {
                 if (count>7)
