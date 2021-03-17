@@ -15,6 +15,9 @@ namespace cachey_bashi
         private ulong _count;
         private ushort _keyLength;
         internal FileStream FileStream { get; }
+        internal FileStream AddrsFileStream { get; }
+        private string addrFile => _file + ".addrs";
+        private BinaryReader _addrReader;
         private BinaryReader _reader;
         private ulong _keyStart;
         private ulong _keyEnd;
@@ -36,7 +39,11 @@ namespace cachey_bashi
             if (File.Exists(_file) && createNew)
                 File.Delete(_file);
 
+            if (File.Exists(addrFile) && createNew)
+                File.Delete(addrFile);
+            
             FileStream = File.Open(_file, FileMode.OpenOrCreate);
+            AddrsFileStream = File.Open(addrFile, FileMode.OpenOrCreate);
             _reader = new BinaryReader(FileStream);
             _readBuffer = new byte[_keyLength*10000];
             _readBufferHandle = GCHandle.Alloc(_readBuffer, GCHandleType.Pinned);
@@ -44,6 +51,8 @@ namespace cachey_bashi
             _readBinBuffer = new HashBin(new byte[_keyLength], false);
             _readBinBuffer.SetFromPartialArray(_readBuffer, 0, _keyLength, false);
 
+            _addrReader = new BinaryReader(AddrsFileStream);
+            
             if (FileStream.Length > 8)
             {
                 _count = _reader.ReadUInt64();
@@ -122,10 +131,13 @@ namespace cachey_bashi
                             if (getDataAddr)
                             {
                                 var foundLocation = FileStream.Position - lastRead + bufReadPos;
-                                FileStream.Position = ((((foundLocation) / _keyLength) << 4) + (long)_keyEnd + (long)HeaderLength);
-                                dataAddr = new DataAddr();
-                                dataAddr.addr = _reader.ReadUInt64();
-                                dataAddr.len = _reader.ReadUInt64();
+                                //FileStream.Position = ((((foundLocation) / _keyLength) << 4) + (long)_keyEnd + (long)HeaderLength);
+                                AddrsFileStream.Position = (foundLocation / _keyLength) << 4;
+                                dataAddr = new DataAddr
+                                {
+                                    addr = _addrReader.ReadUInt64(), 
+                                    len = _addrReader.ReadUInt64()
+                                };
                                 return true;
                             }
 
@@ -171,6 +183,7 @@ namespace cachey_bashi
         public void Dispose()
         {
             FileStream?.Dispose();
+            AddrsFileStream?.Dispose();
         }
     }
 

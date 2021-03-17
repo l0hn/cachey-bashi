@@ -199,15 +199,18 @@ namespace cachey_bashi
                 batches.Add(new CurrentBatchInfo(keyLength, stream));
             }
 
-            var outStream = cb.CbKey.FileStream;
-            var writer = new BinaryWriter(outStream);
-            writer.Write(keyCount);
+            var cbKeyFileStream = cb.CbKey.FileStream;
+            var cbKeyWritter = new BinaryWriter(cbKeyFileStream);
+            cbKeyWritter.Write(keyCount);
+
+            var cbKeyAddrFileStream = cb.CbKey.AddrsFileStream;
+            var cbKeyAddrsWritter = new BinaryWriter(cbKeyAddrFileStream);
             
             var remainingBatches = new List<CurrentBatchInfo>();
             remainingBatches.AddRange(batches);
 
             var currentKeyIndex = -1;
-            var currentKeyRangeStartAddr = outStream.Position;
+            var currentKeyRangeStartAddr = cbKeyFileStream.Position;
 
             ulong keysWritten = 0;
             var addrOffset = cb.CbKey.HeaderLength + (keyCount * keyLength);
@@ -241,27 +244,23 @@ namespace cachey_bashi
                 }
                 else if(currentKeyIndex != keyIndex)//we've reached the end of a key range
                 {
-                    var end = outStream.Position - keyLength;
+                    var end = cbKeyFileStream.Position - keyLength;
                     cb.CbIndex.SetHintForKey(lastHash.Hash, new KeyHint()
                     {
                         StartAddr = (ulong)currentKeyRangeStartAddr,
                         EndAddr = (ulong)end
                     });
-                    currentKeyRangeStartAddr = outStream.Position;
+                    currentKeyRangeStartAddr = cbKeyFileStream.Position;
                     currentKeyIndex = keyIndex;
                 }
                 
-                //write the key
-                outStream.Write(lowestBatch.CurrentHashBin.Hash, 0, lowestBatch.CurrentHashBin.Length);
-                //we can't (be bothered) to attempt write this file sequentially so seek around a bit
-                //SSDs are getting faster after all :)
-                var pos = outStream.Position;
-                var seekTo = (long) (addrOffset + (keysWritten * 16));
-                outStream.Position = seekTo;
-                writer.Write(lowestBatch.CurrentAddr.addr);
-                writer.Write(lowestBatch.CurrentAddr.len);
-                outStream.Position = pos;
+                //write the key to the key  file
+                cbKeyFileStream.Write(lowestBatch.CurrentHashBin.Hash, 0, lowestBatch.CurrentHashBin.Length);
                 
+                //write the data addrs to the addr file
+                cbKeyAddrsWritter.Write(lowestBatch.CurrentAddr.addr);
+                cbKeyAddrsWritter.Write(lowestBatch.CurrentAddr.len);
+
                 //finally move to the next key in the batch
                 lastHash = lowestBatch.CurrentHashBin;
 
@@ -275,7 +274,7 @@ namespace cachey_bashi
             cb.CbIndex.SetHintForKey(lastHash.Hash, new KeyHint()
             {
                 StartAddr = (ulong)currentKeyRangeStartAddr,
-                EndAddr = (ulong)outStream.Position-keyLength
+                EndAddr = (ulong)cbKeyFileStream.Position-keyLength
             });
             
             //write the index out to disk

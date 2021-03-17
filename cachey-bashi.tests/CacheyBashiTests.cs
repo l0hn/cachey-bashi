@@ -12,7 +12,10 @@ namespace cachey_bashi.tests
         [Test]
         [TestCase(10000)]
         [TestCase(100000)]
-        [TestCase(1000000)]
+        [TestCase(235000)]
+        // [TestCase(1000000)]
+        // [TestCase(3000000)]
+        // [TestCase(10000000)]
         public void ReloadTest(int count)
         {
             var r = new Random(DateTime.UtcNow.Millisecond);
