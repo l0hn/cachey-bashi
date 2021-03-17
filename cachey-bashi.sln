@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cachey-bashi.netcore", "cachey-bashi.netcore\cachey-bashi.netcore.csproj", "{3AFE5513-AF19-456D-AF24-6F7F04156D96}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cachey-bashi.net30", "cachey-bashi.net30\cachey-bashi.net30.csproj", "{0F366F88-DA78-4981-A01B-6A42BA1DD19A}"
-EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "cachey-bashi.shared", "cachey-bashi.shared\cachey-bashi.shared.shproj", "{4A88E68D-66CC-4E3D-A12C-5481C4E0A57C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cachey-bashi.tests", "cachey-bashi.tests\cachey-bashi.tests.csproj", "{5517362D-CF80-4EF2-8ED9-B9D72820649C}"
@@ -22,10 +20,6 @@ Global
 		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.ReleaseNetCore|Any CPU.ActiveCfg = Release|Any CPU
 		{3AFE5513-AF19-456D-AF24-6F7F04156D96}.ReleaseNetCore|Any CPU.Build.0 = Release|Any CPU
-		{0F366F88-DA78-4981-A01B-6A42BA1DD19A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0F366F88-DA78-4981-A01B-6A42BA1DD19A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0F366F88-DA78-4981-A01B-6A42BA1DD19A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0F366F88-DA78-4981-A01B-6A42BA1DD19A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5517362D-CF80-4EF2-8ED9-B9D72820649C}.Release|Any CPU.ActiveCfg = Release|Any CPU

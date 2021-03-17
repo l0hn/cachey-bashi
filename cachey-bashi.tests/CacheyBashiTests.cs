@@ -10,11 +10,14 @@ namespace cachey_bashi.tests
     public class CacheyBashiTests
     {
         [Test]
-        public void ReloadTest()
+        [TestCase(10000)]
+        [TestCase(100000)]
+        [TestCase(1000000)]
+        public void ReloadTest(int count)
         {
             var r = new Random(DateTime.UtcNow.Millisecond);
             List<KeyValuePair<HashBin, byte[]>> junkData = new List<KeyValuePair<HashBin, byte[]>>();
-            for (int i = 0; i < 1000000; i++)
+            for (int i = 0; i < count; i++)
             {
                 var buf = new byte[16];
                 r.NextBytes(buf);

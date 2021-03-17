@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace cachey_bashi
 {
@@ -43,6 +44,11 @@ namespace cachey_bashi
         public void UnsafeWrite(byte[] value)
         {
             _fileStream.Write(value, 0, value.Length);
+        }
+
+        public async Task UnsafeWriteAsync(byte[] value)
+        {
+            await _fileStream.WriteAsync(value, 0, value.Length);
         }
 
         public void Dispose()

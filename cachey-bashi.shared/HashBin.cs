@@ -104,6 +104,7 @@ namespace cachey_bashi
         static int Compare(HashBin a, HashBin b)
         {
             return UnsafeCompare(a, b);
+            return SafeCompare(a, b);
         }
         
         static int SafeCompare(HashBin a, HashBin b)
@@ -170,7 +171,7 @@ namespace cachey_bashi
 
             return 0;
         }
-        
+
         static unsafe int UnsafeCompare(HashBin a, HashBin b)
         {
             if (a is null)

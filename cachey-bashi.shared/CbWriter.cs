@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using HPCsharp;
 
 namespace cachey_bashi
 {
@@ -18,15 +22,22 @@ namespace cachey_bashi
         
         public static void Write(CacheyBashi cb, ushort keyLength, IEnumerable<KeyValuePair<HashBin, byte[]>> data)
         {
+            var sw = new Stopwatch();
+            sw.Start();
             List<string> batchFiles = new List<string>();
             var batchNameFormat = Path.Combine(cb.Dir, cb.DbName) + ".keybatch_{0}";
             var batchIndex = 0;
             
             //take batches of 100k? arbitraty or maybe roughly calc mem requirements
-            var keyDataArray = new KeyData[100000];
+            //use 2 buffers, one for writing, and one for streaming out to file?
+            var keyDataHolders = new KeyDataHolder[8];
+            var keyDataArray1 = new KeyData[100000];
+            var keyDataArray2 = new KeyData[100000];
+            var activeKeyDataArray = keyDataArray1;
             var index = 0;
             var datFileIndex = 0;
             var keyCount = (ulong)0;
+            Task batchWriteTask = null;
 
             foreach (var kvp in data)
             {
@@ -34,22 +45,40 @@ namespace cachey_bashi
                     throw new ArgumentException($"All keys must be of the provided keyLength: {keyLength}");
                 
                 //need to copy the key array here incase someone is re-using the buffer
-                keyDataArray[index].Key = kvp.Key.Clone();
-                keyDataArray[index].DataAddr.addr = (ulong)datFileIndex;
-                keyDataArray[index].DataAddr.len = (ulong)kvp.Value.Length;
-                //todo: need to write the dat file here so we can discard data from memory
+                activeKeyDataArray[index].Key = kvp.Key.Clone();
+                activeKeyDataArray[index].DataAddr.addr = (ulong)datFileIndex;
+                activeKeyDataArray[index].DataAddr.len = (ulong)kvp.Value.Length;
+                //need to write the dat file here so we can discard data from memory
+                //cleanup tasks
                 cb.CbData.UnsafeWrite(kvp.Value);
                 datFileIndex += kvp.Value.Length;
 
-                var newBatch = index == keyDataArray.Length - 1;
+                var newBatch = index == activeKeyDataArray.Length - 1;
                 
                 if (newBatch)//time to sort and start a new batch
                 {
                     var batchFile = string.Format(batchNameFormat, batchIndex);
-                    WriteBatch(keyDataArray, batchFile, keyDataArray.Length);
+
+                    batchWriteTask?.Wait();
+                    batchWriteTask?.Dispose();
+                    var array = activeKeyDataArray;
+                    batchWriteTask = Task.Run(() =>
+                    {
+                        WriteBatch(array, batchFile, array.Length);
+                    });
+                        
                     batchFiles.Add(batchFile);
                     batchIndex++;
                     index = 0;
+                    //swap the active buffer
+                    if (activeKeyDataArray == keyDataArray1)
+                    {
+                        activeKeyDataArray = keyDataArray2;
+                    }
+                    else
+                    {
+                        activeKeyDataArray = keyDataArray1;
+                    }
                 }
 
                 if (!newBatch)
@@ -58,12 +87,26 @@ namespace cachey_bashi
                 keyCount++;
             }
 
+            //did we finish processing exactly on a batch boundary?
+            //if so roll back a batch index.
+            if (index == 0 && batchIndex > 0)
+            {
+                batchIndex--;
+            }
+
+            if (batchWriteTask != null && !batchWriteTask.IsCompleted)
+            {
+                batchWriteTask.Wait();
+            }
+
             if (index > 0) //write the remaining keys to the final batch
             {
                 var batchFile = string.Format(batchNameFormat, batchIndex);
-                WriteBatch(keyDataArray, batchFile, (int)index);
+                WriteBatch(activeKeyDataArray, batchFile, (int)index);
                 batchFiles.Add(batchFile);
             }
+
+            Console.WriteLine($"writing batches took: {sw.ElapsedMilliseconds}");
 
             //no more sorting required if only 1 batch so just write the file directly
             if (batchIndex == 1)
@@ -72,12 +115,12 @@ namespace cachey_bashi
                 var writer = new BinaryWriter(outFile);
                 writer.Write(keyCount);
                 //first the keys
-                foreach (var keyData in keyDataArray)
+                foreach (var keyData in activeKeyDataArray)
                 {
                     outFile.Write(keyData.Key.Hash, 0, keyData.Key.Length);
                 }
                 //then the addr infos
-                foreach (var keyData in keyDataArray)
+                foreach (var keyData in activeKeyDataArray)
                 {
                     writer.Write(keyData.DataAddr.addr);
                     writer.Write(keyData.DataAddr.len);
@@ -85,11 +128,20 @@ namespace cachey_bashi
                 return;
             }
             
+            sw.Restart();
             //now sort the batches into the final file
             SortAndWrite(batchFiles, keyCount, cb, keyLength, cb.KeyFile);
+            Console.WriteLine($"sorting batches and writing took: {sw.ElapsedMilliseconds}");
         }
 
         static void WriteBatch(KeyData[] keyDataArray, string outFile, int count)
+        {
+             WriteBatchArraySort(keyDataArray, outFile, count);
+            //WriteBatchLinqSort(keyDataArray, outFile, count);
+            //WriteBatchHpcSort(keyDataArray, outFile, count);
+        }
+        
+        static void WriteBatchArraySort(KeyData[] keyDataArray, string outFile, int count)
         {
             Array.Sort(keyDataArray, 0, count, new KeyDataComparer());
             //write to batch file
@@ -104,6 +156,37 @@ namespace cachey_bashi
             }
             
         } 
+        
+        static void WriteBatchLinqSort(KeyData[] keyDataArray, string outFile, int count)
+        {
+            //Array.Sort(keyDataArray, 0, count, new KeyDataComparer());
+            //write to batch file
+            
+            using var stream = new FileStream(outFile, FileMode.Create);
+            var writer = new BinaryWriter(stream);
+            foreach (var keyData in keyDataArray.Take(count).AsParallel().OrderBy(i => i.Key))
+            {
+                stream.Write(keyData.Key.Hash, 0, keyData.Key.Length);
+                writer.Write(keyData.DataAddr.addr);
+                writer.Write(keyData.DataAddr.len);
+            }
+            
+        } 
+        
+        static void WriteBatchHpcSort(KeyData[] keyDataArray, string outFile, int count)
+        {
+            var data = keyDataArray.SortMergePar(0, count, new KeyDataComparer());
+            //write to batch file
+            
+            using var stream = new FileStream(outFile, FileMode.Create);
+            var writer = new BinaryWriter(stream);
+            for (int i = 0; i < count; i++)
+            {
+                stream.Write(data[i].Key.Hash, 0, data[i].Key.Length);
+                writer.Write(data[i].DataAddr.addr);
+                writer.Write(data[i].DataAddr.len);
+            }
+        } 
 
         static void SortAndWrite(List<string> batchFiles, ulong keyCount, CacheyBashi cb, ushort keyLength, string outFile)
         {
@@ -111,7 +194,7 @@ namespace cachey_bashi
             var batches = new List<CurrentBatchInfo>();
             foreach (var batchFile in batchFiles)
             {
-                var stream = File.OpenRead(batchFile);
+                var stream = new FileStream(batchFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);//File.OpenRead(batchFile);
                 streams.Streams.Add(stream);
                 batches.Add(new CurrentBatchInfo(keyLength, stream));
             }
@@ -227,18 +310,23 @@ namespace cachey_bashi
 
     class CurrentBatchInfo
     {
-        public FileStream Stream;
+        public Stream Stream;
         public BinaryReader Reader;
         public DataAddr CurrentAddr;
         public HashBin CurrentHashBin;
         public bool Complete;
         private ushort _keyLength;
 
-        public CurrentBatchInfo(ushort keyLength, FileStream stream)
+        private long _streamLength;
+        private long _bytesRead;
+        
+        public CurrentBatchInfo(ushort keyLength, Stream stream)
         {
             _keyLength = keyLength;
             Stream = stream;
-            Reader = new BinaryReader(Stream);
+            Reader = new BinaryReader(stream);
+            _streamLength = stream.Length;
+            _bytesRead = stream.Position;
             Next();
         }
         
@@ -251,14 +339,16 @@ namespace cachey_bashi
             }
             
             CurrentHashBin = new HashBin(Stream, _keyLength);
+            _bytesRead += _keyLength;
             CurrentAddr.addr = Reader.ReadUInt64();
             CurrentAddr.len = Reader.ReadUInt64();
+            _bytesRead += 16;
             return true;
         }
 
         bool CheckComplete()
         {
-            if (Stream.Position >= Stream.Length)
+            if (_bytesRead >= _streamLength)
             {
                 Complete = true;
                 return true;
@@ -278,6 +368,34 @@ namespace cachey_bashi
             {
                 stream?.Dispose();
             }
+        }
+    }
+
+    class KeyDataHolder: IDisposable
+    {
+        public KeyData[] KeyDataArray { get; private set; }
+        public ManualResetEvent Sync { get; private set; }
+
+        public KeyDataHolder()
+        {
+            KeyDataArray = new KeyData[100000];
+            Sync = new ManualResetEvent(true);
+        }
+        
+        public static KeyDataHolder[] CreateMany(int count)
+        {
+            var result = new KeyDataHolder[count];
+            for (int i = 0; i < count; i++)
+            {
+                result[0] = new KeyDataHolder();
+            }
+
+            return result;
+        }
+
+        public void Dispose()
+        {
+            Sync?.Dispose();
         }
     }
 }
