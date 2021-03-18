@@ -13,9 +13,5 @@
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
-    <ItemGroup>
-      <PackageReference Include="HPCsharp" Version="3.16.0" />
-    </ItemGroup>
-
     <Import Project="..\cachey-bashi.shared\cachey-bashi.shared.projitems" Label="Shared" Condition="Exists('..\cachey-bashi.shared\cachey-bashi.shared.projitems')" />
 </Project>

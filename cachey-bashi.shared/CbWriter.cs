@@ -6,7 +6,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using HPCsharp;
 
 namespace cachey_bashi
 {
@@ -173,20 +172,20 @@ namespace cachey_bashi
             
         } 
         
-        static void WriteBatchHpcSort(KeyData[] keyDataArray, string outFile, int count)
-        {
-            var data = keyDataArray.SortMergePar(0, count, new KeyDataComparer());
-            //write to batch file
-            
-            using var stream = new FileStream(outFile, FileMode.Create);
-            var writer = new BinaryWriter(stream);
-            for (int i = 0; i < count; i++)
-            {
-                stream.Write(data[i].Key.Hash, 0, data[i].Key.Length);
-                writer.Write(data[i].DataAddr.addr);
-                writer.Write(data[i].DataAddr.len);
-            }
-        } 
+        // static void WriteBatchHpcSort(KeyData[] keyDataArray, string outFile, int count)
+        // {
+        //     var data = keyDataArray.SortMergePar(0, count, new KeyDataComparer());
+        //     //write to batch file
+        //     
+        //     using var stream = new FileStream(outFile, FileMode.Create);
+        //     var writer = new BinaryWriter(stream);
+        //     for (int i = 0; i < count; i++)
+        //     {
+        //         stream.Write(data[i].Key.Hash, 0, data[i].Key.Length);
+        //         writer.Write(data[i].DataAddr.addr);
+        //         writer.Write(data[i].DataAddr.len);
+        //     }
+        // } 
 
         static void SortAndWrite(List<string> batchFiles, ulong keyCount, CacheyBashi cb, ushort keyLength, string outFile)
         {
