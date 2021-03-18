@@ -28,6 +28,8 @@ namespace cachey_bashi
         private byte* _readBufferPtr;
         internal ulong HeaderLength { get; }
 
+        public ulong Count => _count;
+
         public CbKeyFixed(string keyFile, ushort keyLength = 16, bool createNew = false)
         {
             _ulongSize = sizeof(ulong);

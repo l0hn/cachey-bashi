@@ -19,6 +19,8 @@ namespace cachey_bashi
         
         internal CbData CbData { get; }
 
+        public ulong Count => CbKey?.Count ?? 0; 
+        
         private CacheyBashi(string directory, string dbName, ushort keyLength, byte indexKeyLength = 2, bool createNew = false)
         {
             //todo: load the index.cb files into memory
@@ -47,6 +49,9 @@ namespace cachey_bashi
             ushort keyLength, 
             byte indexKeyLength = 2)
         {
+            if (!Directory.Exists(outDir))
+                Directory.CreateDirectory(outDir);
+            
             var cb = new CacheyBashi(outDir, dbName, keyLength, indexKeyLength, true);
             CbWriter.Write(cb, keyLength, data);
 
