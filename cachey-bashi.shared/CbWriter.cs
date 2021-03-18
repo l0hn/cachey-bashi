@@ -105,7 +105,7 @@ namespace cachey_bashi
                 batchFiles.Add(batchFile);
             }
 
-            Console.WriteLine($"writing batches took: {sw.ElapsedMilliseconds}");
+            //Console.WriteLine($"writing batches took: {sw.ElapsedMilliseconds}");
 
             //no more sorting required if only 1 batch so just write the file directly
             if (batchIndex == 1)
@@ -130,7 +130,7 @@ namespace cachey_bashi
             sw.Restart();
             //now sort the batches into the final file
             SortAndWrite(batchFiles, keyCount, cb, keyLength, cb.KeyFile);
-            Console.WriteLine($"sorting batches and writing took: {sw.ElapsedMilliseconds}");
+            //Console.WriteLine($"sorting batches and writing took: {sw.ElapsedMilliseconds}");
         }
 
         static void WriteBatch(KeyData[] keyDataArray, string outFile, int count)
