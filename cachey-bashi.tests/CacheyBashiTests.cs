@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 using NUnit.Framework;
 
 namespace cachey_bashi.tests
@@ -9,14 +11,7 @@ namespace cachey_bashi.tests
     [TestFixture]
     public class CacheyBashiTests
     {
-        [Test]
-        [TestCase(10000)]
-        [TestCase(100000)]
-        [TestCase(235000)]
-        // [TestCase(1000000)]
-        // [TestCase(3000000)]
-        // [TestCase(10000000)]
-        public void ReloadTest(int count)
+        private IEnumerable<KeyValuePair<HashBin, byte[]>> GenerateJunkData(int count)
         {
             var r = new Random(DateTime.UtcNow.Millisecond);
             List<KeyValuePair<HashBin, byte[]>> junkData = new List<KeyValuePair<HashBin, byte[]>>();
@@ -24,11 +19,24 @@ namespace cachey_bashi.tests
             {
                 var buf = new byte[16];
                 r.NextBytes(buf);
-                junkData.Add(new KeyValuePair<HashBin, byte[]>(
-                        buf.ToHashBin(false),
-                        buf
-                    ));
-            }    
+                yield return new KeyValuePair<HashBin, byte[]>(
+                    buf.ToHashBin(false),
+                    buf
+                );
+            }   
+        }
+        
+        
+        [Test]
+        [TestCase(10000)]
+        [TestCase(100000)]
+        [TestCase(235000)]
+        //[TestCase(1000000)]
+        // [TestCase(3000000)]
+        // [TestCase(10000000)]
+        public void ReloadTest(int count)
+        {
+            var junkData = GenerateJunkData(count).ToList();
             
             var dir = Path.GetTempPath();
             var dbName = "cbunittest_reload";
@@ -71,6 +79,37 @@ namespace cachey_bashi.tests
             
             Console.WriteLine($"Took: {sw.ElapsedMilliseconds:N} to fetch {junkData.Count:N} values (where all keys exist)");
             Console.WriteLine($"out dir: {dir}");
+        }
+
+        [Test]
+        public void LostUpdateTest()
+        {
+            var dir = Path.GetTempPath();
+            var dbName = "cbunittest_lostupdate";
+            var sw = new Stopwatch();
+            var junkdata = GenerateJunkData(1000).ToList();
+
+            
+            Console.WriteLine($"adding multiple items with key: {junkdata[0].Key.Hash.ToHexString()}");
+            for (int i = 0; i < 1000; i++)
+            {
+                junkdata.Add(new KeyValuePair<HashBin, byte[]>(
+                    junkdata[0].Key,
+                    Encoding.UTF8.GetBytes($"fail {i}")
+                ));    
+            }
+            
+            junkdata.Add(new KeyValuePair<HashBin, byte[]>(
+                junkdata[0].Key,
+                Encoding.UTF8.GetBytes("success")
+            ));    
+            
+            
+            using var cb = CacheyBashi.Create(dir, dbName, junkdata, 16);
+
+            var value = Encoding.UTF8.GetString(cb.GetValue(junkdata[0].Key));
+            
+            Assert.AreEqual("success", value);
         }
     }
 

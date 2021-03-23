@@ -29,7 +29,7 @@ namespace cachey_bashi
             
             //take batches of 100k? arbitraty or maybe roughly calc mem requirements
             //use 2 buffers, one for writing, and one for streaming out to file?
-            var keyDataHolders = new KeyDataHolder[8];
+            
             var keyDataArray1 = new KeyData[100000];
             var keyDataArray2 = new KeyData[100000];
             var activeKeyDataArray = keyDataArray1;
@@ -187,6 +187,63 @@ namespace cachey_bashi
         //     }
         // } 
 
+        static IEnumerable<CurrentBatchInfoItem> SortAndDedupe(List<CurrentBatchInfo> batchInfos)
+        {
+            CurrentBatchInfoItem last = null;
+            CurrentBatchInfoItem next = null;
+            bool skip = false;
+            
+            while (batchInfos.Count > 0)
+            {
+                skip = false;
+                var lowestBatch = batchInfos.OrderBy(i => i.CurrentBatchInfoItem.CurrentHashBin).First();
+
+                next = lowestBatch.CurrentBatchInfoItem;
+                
+                if (last == null)
+                {
+                    skip = true;
+                    last = lowestBatch.CurrentBatchInfoItem;
+                }
+
+                if (!skip)
+                {
+#if DEBUG
+                    Console.WriteLine($"last: {last.CurrentHashBin.Hash.ToHexString()}. next: {next.CurrentHashBin.Hash.ToHexString()}");
+#endif
+                    
+                    if (next.CurrentHashBin != last.CurrentHashBin)
+                    {
+#if DEBUG
+                        Console.WriteLine($"writing out: {last.CurrentHashBin.Hash.ToHexString()}");
+#endif
+                        yield return last;
+                        last = next;
+                    }
+
+                    else
+                    {
+#if DEBUG
+                        Console.WriteLine($"skipping: {last.CurrentHashBin}");
+#endif
+                        if (last.CurrentAddr.addr < next.CurrentAddr.addr)
+                        {
+                            last = next;    
+                        }
+                    }
+
+                    
+                }
+                
+                if (!lowestBatch.Next())
+                {
+                    batchInfos.Remove(lowestBatch);
+                }
+            }
+
+            yield return last;
+        }
+
         static void SortAndWrite(List<string> batchFiles, ulong keyCount, CacheyBashi cb, ushort keyLength, string outFile)
         {
             using var streams = new StreamCollection();
@@ -218,25 +275,11 @@ namespace cachey_bashi
 // #if DEBUG
 //             var debugHash = new HashBin("0000000000000000000000000000d8f4");
 // #endif
-            
-            while (remainingBatches.Count > 0)
+
+            foreach (var nextItem in SortAndDedupe(remainingBatches))
             {
-                var lowestBatch = remainingBatches.OrderBy(i => i.CurrentHashBin).First();
-
-// #if DEBUG
-//                 if (lowestBatch.CurrentHashBin == null)
-//                 {
-//                     Console.WriteLine("DebugMe");
-//                 }
-//                 
-//                 if (debugHash == lowestBatch.CurrentHashBin)
-//                 {
-//                     Console.WriteLine("DebugMe");
-//                 }
-// #endif
-
                 //update the index if we've reached the end of a key range
-                var keyIndex = cb.CbIndex.GetKeyIndexFromKey(lowestBatch.CurrentHashBin);
+                var keyIndex = cb.CbIndex.GetKeyIndexFromKey(nextItem.CurrentHashBin);
                 if (currentKeyIndex == -1)
                 {
                     currentKeyIndex = keyIndex;
@@ -254,18 +297,15 @@ namespace cachey_bashi
                 }
                 
                 //write the key to the key  file
-                cbKeyFileStream.Write(lowestBatch.CurrentHashBin.Hash, 0, lowestBatch.CurrentHashBin.Length);
+                cbKeyFileStream.Write(nextItem.CurrentHashBin.Hash, 0, nextItem.CurrentHashBin.Length);
                 
                 //write the data addrs to the addr file
-                cbKeyAddrsWritter.Write(lowestBatch.CurrentAddr.addr);
-                cbKeyAddrsWritter.Write(lowestBatch.CurrentAddr.len);
+                cbKeyAddrsWritter.Write(nextItem.CurrentAddr.addr);
+                cbKeyAddrsWritter.Write(nextItem.CurrentAddr.len);
 
                 //finally move to the next key in the batch
-                lastHash = lowestBatch.CurrentHashBin;
+                lastHash = nextItem.CurrentHashBin;
 
-                if (!lowestBatch.Next())
-                    remainingBatches.Remove(lowestBatch);
-                
                 keysWritten++;
             }
             
@@ -306,12 +346,19 @@ namespace cachey_bashi
         }
     }
 
+    class CurrentBatchInfoItem
+    {
+        public DataAddr CurrentAddr;
+        public HashBin CurrentHashBin;
+    }
+
     class CurrentBatchInfo
     {
         public Stream Stream;
         public BinaryReader Reader;
-        public DataAddr CurrentAddr;
-        public HashBin CurrentHashBin;
+
+        public CurrentBatchInfoItem CurrentBatchInfoItem;
+        
         public bool Complete;
         private ushort _keyLength;
 
@@ -332,14 +379,15 @@ namespace cachey_bashi
         {
             if (CheckComplete())
             {
-                CurrentHashBin = null;
+                CurrentBatchInfoItem = null;
                 return false;
             }
-            
-            CurrentHashBin = new HashBin(Stream, _keyLength);
+
+            CurrentBatchInfoItem = new CurrentBatchInfoItem();
+            CurrentBatchInfoItem.CurrentHashBin = new HashBin(Stream, _keyLength);
             _bytesRead += _keyLength;
-            CurrentAddr.addr = Reader.ReadUInt64();
-            CurrentAddr.len = Reader.ReadUInt64();
+            CurrentBatchInfoItem.CurrentAddr.addr = Reader.ReadUInt64();
+            CurrentBatchInfoItem.CurrentAddr.len = Reader.ReadUInt64();
             _bytesRead += 16;
             return true;
         }

@@ -104,7 +104,7 @@ namespace cachey_bashi
         static int Compare(HashBin a, HashBin b)
         {
             return UnsafeCompare(a, b);
-            return SafeCompare(a, b);
+            //return SafeCompare(a, b);
         }
         
         static int SafeCompare(HashBin a, HashBin b)
@@ -334,6 +334,14 @@ namespace cachey_bashi
         public HashBin Clone(bool shallow = false)
         {
             return new HashBin(_hash, !shallow);
+        }
+
+        public override int GetHashCode()
+        {
+            if (Hash == null)
+                return 0;
+            
+            return BitConverter.ToInt32(Hash, 0);
         }
     }
 
