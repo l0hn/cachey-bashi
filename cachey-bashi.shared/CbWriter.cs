@@ -209,13 +209,13 @@ namespace cachey_bashi
                 if (!skip)
                 {
 #if DEBUG
-                    Console.WriteLine($"last: {last.CurrentHashBin.Hash.ToHexString()}. next: {next.CurrentHashBin.Hash.ToHexString()}");
+                    //Console.WriteLine($"last: {last.CurrentHashBin.Hash.ToHexString()}. next: {next.CurrentHashBin.Hash.ToHexString()}");
 #endif
                     
                     if (next.CurrentHashBin != last.CurrentHashBin)
                     {
 #if DEBUG
-                        Console.WriteLine($"writing out: {last.CurrentHashBin.Hash.ToHexString()}");
+                        //Console.WriteLine($"writing out: {last.CurrentHashBin.Hash.ToHexString()}");
 #endif
                         yield return last;
                         last = next;
@@ -224,7 +224,7 @@ namespace cachey_bashi
                     else
                     {
 #if DEBUG
-                        Console.WriteLine($"skipping: {last.CurrentHashBin}");
+                        //Console.WriteLine($"skipping: {last.CurrentHashBin}");
 #endif
                         if (last.CurrentAddr.addr < next.CurrentAddr.addr)
                         {

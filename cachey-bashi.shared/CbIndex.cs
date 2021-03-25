@@ -102,10 +102,10 @@ namespace cachey_bashi
         {
             var index = GetKeyIndexFromKey(key);
 #if DEBUG
-            if (index > _indexData.Length-1)
-            {
-                Console.WriteLine("DebugMe");   
-            }
+            // if (index > _indexData.Length-1)
+            // {
+            //     Console.WriteLine("DebugMe");   
+            // }
 #endif
             
             fixed (byte* pIndex = &_indexData[index])

@@ -57,7 +57,7 @@ namespace cachey_bashi
 #if DEBUG
             if (sw.ElapsedMilliseconds > 4)
             {
-                Console.WriteLine("Slow file read");
+                //Console.WriteLine("Slow file read");
             }
 #endif
             if (_length != read)
